@@ -1,0 +1,9 @@
+# Fast feedback on every commit:
+#   1. lint-staged: ESLint --fix on staged TS/TSX files only
+#   2. tsc -b:      project-wide type-check (no isolated mode for refs)
+#   3. unit tests:  pure functions in src/lib are quick (~1s)
+#
+# Heavier checks (e2e, build) live in CI to keep commits snappy.
+npx lint-staged
+npx tsc -b
+npm run test:unit

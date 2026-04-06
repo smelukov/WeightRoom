@@ -1,0 +1,238 @@
+import { useState } from "react";
+import { LuChevronDown } from "react-icons/lu";
+
+// NOTE: When you change a formula in src/lib/calculator.ts, update the
+// matching FormulaBlock / FormulaCard below. The footer is the only place
+// where the math is exposed to end-users — drift here means users will
+// scratch their heads at numbers they can't reproduce.
+
+export function Footer() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <footer className="mt-auto border-t border-border">
+      <div className="max-w-3xl mx-auto px-4">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="w-full py-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          aria-expanded={open}
+          aria-controls="methodology-panel"
+        >
+          <span>How calculations work</span>
+          <LuChevronDown
+            className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+
+        <div
+          id="methodology-panel"
+          className={`grid transition-[grid-template-rows] duration-300 ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+        >
+          <div className="overflow-hidden">
+            <div className="pb-6 space-y-4 text-xs text-muted-foreground">
+              {/* Total RAM */}
+              <FormulaBlock
+                title="Total RAM"
+                formula="Weights + KV Cache + OS Overhead"
+                note="OS Overhead defaults to 2 GB (Linux). Adjust in the hardware panel: macOS / Windows ≈ 6 GB, iOS ≈ 2 GB."
+              />
+
+              {/* Weights */}
+              <FormulaBlock
+                title="Weights"
+                formula="Params × (bits / 8) × 1.1"
+                note="The ×1.1 factor accounts for tensors that are NOT quantized (token embeddings, layer norms, lm_head). Special case: Q1 uses ×1.0 because its bits-per-weight (1.25) already includes the per-group scale-factor overhead."
+              />
+
+              {/* KV Cache */}
+              <div className="space-y-2">
+                <div className="text-[11px] font-medium text-foreground">
+                  KV Cache (depends on architecture)
+                </div>
+                <p className="text-[10px] text-muted-foreground/70">
+                  T = context tokens, L = layers, KV_H = num_key_value_heads, H_D = head_dim,
+                  bytes = KV-cache element size (e.g. 2 for FP16). Multiplied by concurrent users × fill %.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <FormulaCard
+                    label="Standard GQA"
+                    models="Llama, Qwen 2.5, Mistral, Phi"
+                    formula="2 × L × KV_H × H_D × T × bytes"
+                    note="The ×2 stores K and V separately. Linear in context length."
+                  />
+                  <FormulaCard
+                    label="Sliding Window (hybrid)"
+                    models="Gemma 2 / 3 / 4"
+                    formula="sliding_layers × … × min(T, W) + full_layers × … × T"
+                    note="Local-attention layers cap memory at W (sliding window, e.g. 4096). Only every Nth layer keeps a full cache. Gemma 4 also sets attention_k_eq_v=true on dense 31B and the MoE 26B variant — K and V share storage, halving the KV cache."
+                  />
+                  <FormulaCard
+                    label="MLA"
+                    models="DeepSeek V2 / V3 / R1"
+                    formula="L × (kv_lora_rank + qk_rope_dim) × T × bytes"
+                    note="No ×2: K and V share a single low-rank latent projection. ~10–20× smaller than standard GQA."
+                  />
+                  <FormulaCard
+                    label="Linear + Full (linear_hybrid)"
+                    models="Qwen 3.5"
+                    formula="2 × full_layers × KV_H × H_D × T × bytes"
+                    note="Linear-attention layers use a fixed-size recurrent state (≈0 memory). Only sparse full-attention layers grow with T."
+                  />
+                </div>
+              </div>
+
+              {/* KV cache fill % per engine */}
+              <div className="space-y-2">
+                <div className="text-[11px] font-medium text-foreground">
+                  KV cache fill % (engine pre-allocation behaviour)
+                </div>
+                <p className="text-[10px] text-muted-foreground/70">
+                  The KV-cache term above is multiplied by{" "}
+                  <code className="bg-secondary px-1 rounded">fill_pct / 100</code> to
+                  model how much of the context window your inference engine actually
+                  reserves per slot. Pick the closest preset, or set a custom value if
+                  your workload is unusual.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <FormulaCard
+                    label="Pre-allocation · 100%"
+                    models="llama.cpp · Ollama · MLX"
+                    formula="full context reserved per slot"
+                    note="Full KV cache pre-allocated at startup, regardless of actual prompt length. Worst-case memory but predictable performance — typical for desktop/local inference."
+                  />
+                  <FormulaCard
+                    label="PagedAttention · 25%"
+                    models="vLLM · SGLang · TGI"
+                    formula="pages allocated from a shared pool"
+                    note="Only pages for actual tokens are allocated. ~25% is a typical chatbot fill rate; longer conversations push it higher. The default for production serving."
+                  />
+                  <FormulaCard
+                    label="TensorRT-LLM · 30%"
+                    models="Triton + TensorRT-LLM"
+                    formula="paged KV + CUDA-optimised kernels"
+                    note="NVIDIA's production stack with paged KV cache. Slightly higher fill rate than vLLM in practice due to different page-eviction heuristics."
+                  />
+                  <FormulaCard
+                    label="Custom · 1–100%"
+                    models="Manual override"
+                    formula="user-supplied fill_pct"
+                    note="Use this for unusual engines, long-context workloads, or to model a specific load profile. Shared via URL state, so estimates are reproducible."
+                  />
+                </div>
+              </div>
+
+              {/* MoE */}
+              <FormulaBlock
+                title="MoE: total vs active parameters"
+                formula="RAM uses TOTAL params · TPS uses ACTIVE params"
+                note="Mixture-of-Experts models (Mixtral, Qwen3-30B-A3B, DeepSeek V3, Llama 4) keep ALL experts in RAM, but only a small subset is read per token. Without this distinction TPS would be under-estimated up to ~10× — e.g. DeepSeek V3 (671B total / 37B active) reads only the 37B per token despite needing 671B of RAM."
+              />
+
+              {/* TPS */}
+              <FormulaBlock
+                title="TPS (tokens / second, per user)"
+                formula="effective_BW / (active_params × bytes/param × 1.1 + KV_traffic)"
+                note="effective_BW = (GPUs × GPU_BW or RAM_BW) × efficiency (default 0.8). KV_traffic per decode step = read all cached K/V for prior tokens + write the new one — uses the same architecture-specific formula as above. With N concurrent users, KV_traffic is multiplied by N (per-user bandwidth shrinks accordingly)."
+              />
+
+              {/* Storage */}
+              <FormulaBlock
+                title="Storage"
+                formula="Params × (bits / 8) × 1.05  +  20 GB OS"
+                note="The ×1.05 is the on-disk equivalent of the ×1.1 RAM overhead — slightly smaller because GGUF packs unquantized tensors more densely. OS overhead covers a minimal Linux installation."
+              />
+
+              {/* Supported formats */}
+              <div className="space-y-2">
+                <div className="text-[11px] font-medium text-foreground">
+                  Supported model formats
+                </div>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <FormulaCard
+                    label="HF Transformers"
+                    models="Full-precision BF16/FP16, GPTQ, AWQ"
+                    formula="config.json + safetensors"
+                    note="Fully supported. Quantization auto-detected for INT4 / INT8 / FP8 models."
+                  />
+                  <FormulaCard
+                    label="MLX (Apple Silicon)"
+                    models="mlx-community and similar repos"
+                    formula="config.json present"
+                    note="Works for standard quants. 1-bit U32 packing may misreport param count — import the original repo instead."
+                  />
+                  <FormulaCard
+                    label="GGUF (llama.cpp)"
+                    models="TheBloke, bartowski, etc."
+                    formula="No config.json — ❌ not supported"
+                    note="Import the original HF Transformers repo, then select quantization manually."
+                  />
+                  <FormulaCard
+                    label="Q1_0 (1-bit)"
+                    models="Bonsai, BitNet b1.58, etc."
+                    formula="Params × (1.25 / 8) × 1.0"
+                    note="GGUF Q1_0 ≈ 1.125 bpw, MLX 1-bit ≈ 1.25 bpw — both include per-group scale factors. We use the more conservative MLX value, which may slightly over-estimate GGUF-only deployments."
+                  />
+                </div>
+              </div>
+
+              <p className="text-[10px] text-muted-foreground/70">
+                Architecture parameters are pulled from HuggingFace{" "}
+                <code className="bg-secondary px-1 rounded">config.json</code>.
+                Use <code className="bg-secondary px-1 rounded">num_key_value_heads</code>{" "}
+                (not total heads) for GQA models. For MoE, active params are estimated from{" "}
+                <code className="bg-secondary px-1 rounded">num_experts_per_tok</code> ×{" "}
+                <code className="bg-secondary px-1 rounded">moe_intermediate_size</code> when available,
+                otherwise from a ratio heuristic.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function FormulaBlock({
+  title,
+  formula,
+  note,
+}: {
+  title: string;
+  formula: string;
+  note?: string;
+}) {
+  return (
+    <div>
+      <div className="text-[11px] font-medium text-foreground">{title}</div>
+      <code className="text-[11px] bg-secondary/70 px-1.5 py-0.5 rounded inline-block mt-0.5">
+        {formula}
+      </code>
+      {note && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{note}</p>}
+    </div>
+  );
+}
+
+function FormulaCard({
+  label,
+  models,
+  formula,
+  note,
+}: {
+  label: string;
+  models: string;
+  formula: string;
+  note?: string;
+}) {
+  return (
+    <div className="rounded-md bg-secondary/40 border border-border/50 p-2 space-y-0.5">
+      <div className="text-[11px] font-medium text-foreground leading-tight">{label}</div>
+      <div className="text-[10px] text-muted-foreground/70">{models}</div>
+      <code className="text-[10px] bg-secondary/70 px-1 py-0.5 rounded inline-block">
+        {formula}
+      </code>
+      {note && <p className="text-[10px] text-muted-foreground/70">{note}</p>}
+    </div>
+  );
+}
