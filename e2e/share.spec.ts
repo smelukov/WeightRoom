@@ -90,24 +90,29 @@ test.describe("URL state sharing", () => {
     await expect(page2.getByText("Comparison Chart")).toBeVisible();
   });
 
-  test("Share button shows 'Copied!' and puts URL in clipboard", async ({ page }) => {
+  test("Share dialog → Link tab copies URL to clipboard", async ({ page }) => {
     await page.goto("/");
     await page.waitForSelector(".text-4xl");
     await page.waitForTimeout(800);
 
     await page.context().grantPermissions(["clipboard-write", "clipboard-read"]);
 
-    // Header buttons are icon-only with aria-labels (visible "Share" text was
-    // removed when we moved to a tooltip-driven toolbar). Find by accessible
-    // name; the label flips to "Copied!" on success.
-    const shareBtn = page.getByRole("button", { name: /copy share link/i });
-    await shareBtn.click();
+    // The Share button in the header now opens a modal (Link / Image / Badge /
+    // Embed tabs) instead of copying the URL inline. The Link tab is the
+    // default-active tab and contains the Copy button we want to drive.
+    await page.getByRole("button", { name: /share configuration/i }).click();
 
-    // The accessible name briefly changes to "Copied!" (driven by a 2-second
-    // state flip). Wait for that flip rather than asserting on inner text —
-    // the icon swap (Share → Check) makes textContent unreliable.
+    // Scope the lookup to the dialog so we don't accidentally grab a Copy
+    // button rendered elsewhere on the page (and to ensure the modal is
+    // actually mounted before clicking).
+    const dialog = page.locator('[data-slot="dialog-content"]');
+    await expect(dialog).toBeVisible();
+
+    // CopyButton renders "Copy" by default and flips to "Copied!" on success.
+    await dialog.getByRole("button", { name: /^copy$/i }).click();
+
     await expect(
-      page.getByRole("button", { name: /copied!/i }),
+      dialog.getByRole("button", { name: /copied!/i }),
     ).toBeVisible();
 
     const clipboardText = await page.evaluate(() =>

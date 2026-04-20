@@ -22,6 +22,8 @@ import {
 import { SiGithub } from "react-icons/si";
 import { useState } from "react";
 import { ThemeToggle } from "./ThemeToggle";
+import { ShareModal } from "@/share/ShareModal";
+import type { CardData } from "@/lib/types";
 
 const REPO_URL = "https://github.com/smelukov/WeightRoom";
 
@@ -42,6 +44,9 @@ interface HeaderProps {
     | ((action: "save" | "copy") => void | Promise<void>)
     | undefined;
   screenshotCapturing?: boolean | undefined;
+  /** Current card configurations — passed through to the Share modal so it
+   *  can build link/image/badge/embed artefacts without re-reading the URL. */
+  configs: CardData[];
 }
 
 export function Header({
@@ -51,18 +56,12 @@ export function Header({
   onClear,
   onScreenshot,
   screenshotCapturing,
+  configs,
 }: HeaderProps) {
-  const [copied, setCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [screenshotResult, setScreenshotResult] = useState<
     "saved" | "copied" | null
   >(null);
-
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
 
   const handleScreenshotAction = async (action: "save" | "copy") => {
     if (!onScreenshot) return;
@@ -107,20 +106,23 @@ export function Header({
             render={
               <button
                 type="button"
-                onClick={handleShare}
-                aria-label={copied ? "Copied!" : "Copy share link"}
+                onClick={() => setShareOpen(true)}
+                aria-label="Share configuration"
                 className={ICON_BUTTON_CLASS}
               >
-                {copied ? (
-                  <LuCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                ) : (
-                  <LuShare2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                )}
+                <LuShare2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
               </button>
             }
           />
-          <TooltipContent>{copied ? "Copied!" : "Copy share link"}</TooltipContent>
+          <TooltipContent>Share…</TooltipContent>
         </Tooltip>
+
+        <ShareModal
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          mode={mode}
+          configs={configs}
+        />
 
         {onScreenshot && (
           <DropdownMenu>

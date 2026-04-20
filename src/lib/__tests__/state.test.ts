@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { encodeState, decodeState } from "../state";
+import {
+  encodeState,
+  decodeState,
+  encodeStateForEmbed,
+  decodeStateForEmbed,
+} from "../state";
 import type { SavedState } from "../state";
 
 const minimalCard = {
@@ -187,5 +192,83 @@ describe("decodeState (golden URLs)", () => {
     expect(c.model.quant).toBe("q4_k_m");
     expect(c.model.contextK).toBe(32);
     expect(c.hosting.osOverheadGb).toBe(2);
+  });
+});
+
+// ─── Embed-widget single-card encoding ───────────────────────────────────────
+// `encodeStateForEmbed` powers the iframe widget URL. It must:
+//   1. Round-trip every field of a CardData losslessly.
+//   2. Emit URL-safe base64 (no `+`, `/`, `=`).
+//   3. Stay strictly shorter than the multi-card `encodeState({ configs:[c] })`
+//      envelope so iframe `src` URLs don't bloat.
+//   4. Survive Unicode content (CJK, Cyrillic, emoji) without mojibake.
+//   5. Reject malformed input by returning null (no exceptions).
+
+describe("encodeStateForEmbed / decodeStateForEmbed", () => {
+  it("round-trips a minimal card losslessly", () => {
+    const encoded = encodeStateForEmbed(minimalCard);
+    expect(encoded).toBeTruthy();
+    const decoded = decodeStateForEmbed(encoded);
+    expect(decoded).toEqual(minimalCard);
+  });
+
+  it("emits URL-safe base64 (no +, /, or = characters)", () => {
+    const encoded = encodeStateForEmbed(minimalCard);
+    expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(encoded).not.toMatch(/[+/=]/);
+  });
+
+  it("produces shorter output than the multi-card envelope", () => {
+    // Single-card envelope is wasteful for embeds — the whole point of
+    // encodeStateForEmbed is to drop the {mode, configs:[…]} wrapper. If
+    // someone "fixes" encodeStateForEmbed to wrap again, this guard fires.
+    const wrappedLen = encodeState({
+      mode: "single",
+      configs: [minimalCard],
+    }).length;
+    const embedLen = encodeStateForEmbed(minimalCard).length;
+    expect(embedLen).toBeLessThan(wrappedLen);
+  });
+
+  it("survives Unicode content without mojibake", () => {
+    const cardWithUnicode = {
+      ...minimalCard,
+      hosting: { ...minimalCard.hosting, notes: "сервер 服务器 🧮" },
+    };
+    const decoded = decodeStateForEmbed(encodeStateForEmbed(cardWithUnicode));
+    expect(decoded?.hosting.notes).toBe("сервер 服务器 🧮");
+  });
+
+  it("returns null for an empty string", () => {
+    expect(decodeStateForEmbed("")).toBeNull();
+  });
+
+  it("returns null for malformed base64", () => {
+    expect(decodeStateForEmbed("not-valid-base64!!!")).toBeNull();
+  });
+
+  it("returns null for valid base64 that is not valid JSON", () => {
+    const garbage = btoa("definitely not json")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+    expect(decodeStateForEmbed(garbage)).toBeNull();
+  });
+
+  it("returns null when the decoded object lacks required keys", () => {
+    // A cardless payload should not be silently passed through to renderers.
+    const incomplete = btoa(JSON.stringify({ id: "x" }))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+    expect(decodeStateForEmbed(incomplete)).toBeNull();
+  });
+
+  it("rejects multi-card SavedState payloads (wrong shape for embed)", () => {
+    // The embed format expects ONE card, not the {configs:[…]} envelope.
+    // Accidentally accepting it would render only the first card and silently
+    // drop the rest — a user-visible footgun. Better to fail loudly.
+    const wrapped = encodeState({ mode: "single", configs: [minimalCard] });
+    expect(decodeStateForEmbed(wrapped)).toBeNull();
   });
 });

@@ -17,10 +17,17 @@ export default defineConfig({
       reportsDirectory: "./coverage",
       // Only measure source code we actually ship — UI primitives and
       // generated/vendored code under src/components/ui aren't worth tracking.
-      include: ["src/lib/**/*.ts", "src/hooks/**/*.ts"],
+      include: ["src/lib/**/*.{ts,tsx}", "src/hooks/**/*.ts"],
       exclude: [
         "src/lib/**/__tests__/**",
         "src/lib/types.ts",
+        // screenshot.tsx is a thin wrapper around html-to-image / Clipboard /
+        // createRoot — it's almost entirely DOM glue and capturing it under
+        // jsdom would need a stack of mocks that proves nothing about the
+        // real browser path. We cover the share-card *math* via shieldSvg
+        // and state tests; the html-to-image dance is verified by hand
+        // during the smoke-deploy step.
+        "src/lib/screenshot.tsx",
       ],
       // Hard floors. Globals are calibrated slightly below current numbers so
       // small refactors don't flap the build, while per-file thresholds keep a
