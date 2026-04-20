@@ -2,10 +2,9 @@ import { LuExternalLink } from "react-icons/lu";
 import { calcLLMRam, calcDisk, calcValueScore } from "@/lib/calculator";
 import { resolveModel, getCalcOptions, getValueScoreInput } from "@/lib/calcInput";
 import { encodeState } from "@/lib/state";
+import { getShareBaseUrl } from "@/lib/url";
 import { KNOWN_MODELS } from "@/lib/models";
 import type { CardData } from "@/lib/types";
-
-const CANONICAL_BASE = "https://smelukov.github.io/WeightRoom/";
 
 interface EmbedCardProps {
   card: CardData;
@@ -145,7 +144,7 @@ export function EmbedCard({ card }: EmbedCardProps) {
   const score = calcValueScore(getValueScoreInput(card, model));
   const tps = score?.tps ?? null;
 
-  const fullStateUrl = `${CANONICAL_BASE}?s=${encodeState({
+  const fullStateUrl = `${getShareBaseUrl()}?s=${encodeState({
     mode: "single",
     configs: [card],
   })}`;

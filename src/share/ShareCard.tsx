@@ -7,12 +7,30 @@ import {
   getValueScoreInput,
 } from "@/lib/calcInput";
 import { encodeState } from "@/lib/state";
+import { getShareBaseUrl } from "@/lib/url";
 import { KNOWN_MODELS } from "@/lib/models";
 import type { CardData } from "@/lib/types";
 import type { ShareFormat } from "./formats";
 
-const CANONICAL_BASE = "https://smelukov.github.io/WeightRoom/";
-const LOGO_URL = `${CANONICAL_BASE}logo.svg`;
+/**
+ * Logo path served from the same deployment that hosts the calculator. We
+ * resolve it lazily (inside the render) instead of at module load so the
+ * value picks up the right host when the share card is mounted off-screen
+ * in a freshly created portal.
+ */
+function getLogoUrl(): string {
+  return `${getShareBaseUrl()}logo.svg`;
+}
+
+/**
+ * Compact "host/path" label shown in the brand strip of screenshots — e.g.
+ * `smelukov.github.io/WeightRoom`, `smelukov-weightroom.static.hf.space`,
+ * or whatever domain the user is currently rendering from. Strips the
+ * protocol and trailing slash so the screenshot stays clean.
+ */
+function getBrandHost(): string {
+  return getShareBaseUrl().replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
 
 export type ShareTheme = "light" | "dark";
 
@@ -116,7 +134,7 @@ interface DerivedMetrics {
 
 function derive(card: CardData): DerivedMetrics {
   const model = resolveModel(card);
-  const shareUrl = `${CANONICAL_BASE}?s=${encodeState({
+  const shareUrl = `${getShareBaseUrl()}?s=${encodeState({
     mode: "single",
     configs: [card],
   })}`;
@@ -237,7 +255,7 @@ function BrandRow({
       }}
     >
       <img
-        src={LOGO_URL}
+        src={getLogoUrl()}
         alt=""
         crossOrigin="anonymous"
         style={{ width: fontSize * 1.4, height: fontSize * 1.4, borderRadius: 6 }}
@@ -408,7 +426,7 @@ function SocialLayout({
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {hardware}
         </span>
-        <span style={{ flexShrink: 0 }}>smelukov.github.io/WeightRoom</span>
+        <span style={{ flexShrink: 0 }}>{getBrandHost()}</span>
       </div>
     </div>
   );
@@ -447,7 +465,7 @@ function CardBadgeLayout({
       }}
     >
       <img
-        src={LOGO_URL}
+        src={getLogoUrl()}
         alt=""
         crossOrigin="anonymous"
         style={{ width: 48, height: 48, borderRadius: 8, flexShrink: 0 }}
