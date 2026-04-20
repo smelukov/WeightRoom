@@ -135,6 +135,9 @@ function SpeedBlock({
           {label && <div className={`text-xs font-semibold mt-0.5 ${label.color}`}>{label.label}</div>}
         </>
       )}
+      <div className="pt-1.5 mt-1.5 border-t border-border/50 text-center text-[10px] italic text-muted-foreground/80">
+        theoretical maximum
+      </div>
     </div>
   );
 }
@@ -149,9 +152,17 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-1">
-        <Label className="text-xs">{label}</Label>
+    <div className="space-y-1 min-w-0">
+      {/* shadcn `Label` is itself `display: flex`, so a `truncate` class on
+          it does NOT clip its text content — `text-overflow: ellipsis`
+          requires a *block* container with a definite width. We wrap the
+          label text in an inner <span> and put `truncate` there. The
+          `flex-1 min-w-0` on `Label` lets that span actually shrink inside
+          the parent flex row instead of forcing its intrinsic width. */}
+      <div className="flex items-center gap-1 min-w-0">
+        <Label className="text-xs min-w-0 flex-1">
+          <span className="truncate">{label}</span>
+        </Label>
         {tooltip && <InfoTooltip content={tooltip} />}
       </div>
       {children}
@@ -369,7 +380,11 @@ export function AvailableHardware({
 
       {/* ── GPU ─────────────────────────────────────────────────────────── */}
       <SectionLabel>GPU</SectionLabel>
-      <div className="grid grid-cols-4 gap-2">
+      {/* 4 columns need ≥768px to fit "VRAM (GB)" + the `?` icon + an input
+          like `e.g. 1555` without truncating. At sm (≥640) — e.g. iPhone
+          Plus landscape — there isn't enough room, so we stay at 2 cols
+          until md. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <Field label="Count" tooltip="Number of GPU devices, e.g. 8 for 8×A100.">
           <Input type="number" placeholder="0" value={hosting.gpuCount}
             onChange={(e) => update("gpuCount", e.target.value)} className="h-7 text-xs" />
@@ -390,7 +405,7 @@ export function AvailableHardware({
 
       {/* ── CPU ─────────────────────────────────────────────────────────── */}
       <SectionLabel>CPU</SectionLabel>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <Field label="Cores" tooltip="Number of CPU cores (vCPUs).">
           <Input type="number" placeholder="0" value={hosting.cpuCores}
             onChange={(e) => update("cpuCores", e.target.value)} className="h-7 text-xs" />
@@ -407,7 +422,7 @@ export function AvailableHardware({
 
       {/* ── Memory ──────────────────────────────────────────────────────── */}
       <SectionLabel>Memory</SectionLabel>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <Field label="RAM (GB)" tooltip="Total system RAM. For Apple Silicon, this is the unified memory size.">
           <InputGroup className="h-7">
             <InputGroupInput type="number" placeholder="e.g. 128" value={availableRam}
@@ -426,58 +441,62 @@ export function AvailableHardware({
       </div>
 
       {/* OS Overhead */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1 shrink-0">
+      <div className="space-y-1 min-w-0">
+        <div className="flex items-center gap-1">
           <Label className="text-xs">OS Overhead</Label>
           <InfoTooltip content="RAM consumed by the OS and background services. Linux / iOS ≈ 2 GB, macOS / Windows ≈ 6 GB." />
         </div>
-        <div className="flex gap-1">
-          {OS_PRESETS.map((p) => (
-            <button key={p.label} type="button" title={p.title}
-              onClick={() => onOsOverheadGbChange(p.value)}
-              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
-                osOverheadGb === p.value
-                  ? "bg-primary/10 border-primary/40 text-foreground"
-                  : "bg-secondary/50 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
-              }`}>
-              {p.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap gap-1">
+            {OS_PRESETS.map((p) => (
+              <button key={p.label} type="button" title={p.title}
+                onClick={() => onOsOverheadGbChange(p.value)}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                  osOverheadGb === p.value
+                    ? "bg-primary/10 border-primary/40 text-foreground"
+                    : "bg-secondary/50 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                }`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <InputGroup className="h-7 w-20 ml-auto">
+            <InputGroupInput type="number" min={0} value={osOverheadGb}
+              onChange={(e) => onOsOverheadGbChange(Math.max(0, Number(e.target.value)))}
+              className="text-xs" />
+            <InputGroupAddon align="inline-end">GB</InputGroupAddon>
+          </InputGroup>
         </div>
-        <InputGroup className="h-7 w-20 shrink-0">
-          <InputGroupInput type="number" min={0} value={osOverheadGb}
-            onChange={(e) => onOsOverheadGbChange(Math.max(0, Number(e.target.value)))}
-            className="text-xs" />
-          <InputGroupAddon align="inline-end">GB</InputGroupAddon>
-        </InputGroup>
       </div>
 
       {/* Bandwidth Efficiency */}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1 shrink-0">
+      <div className="space-y-1 min-w-0">
+        <div className="flex items-center gap-1">
           <Label className="text-xs">BW Efficiency</Label>
           <InfoTooltip content="Ratio of real-world LLM throughput to theoretical peak bandwidth (%). Peak is never fully utilized due to non-sequential memory access in Q4/Q8 dequantization, kernel launch overhead, and driver overhead. Apple Silicon ≈ 60%, discrete GPU HBM ≈ 80%, CPU DDR5 ≈ 65%." />
         </div>
-        <div className="flex gap-1">
-          {efficiencyPresets.map((p) => (
-            <button key={p.label} type="button" title={p.title}
-              onClick={() => update("efficiency", p.value)}
-              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
-                hosting.efficiency === p.value
-                  ? "bg-primary/10 border-primary/40 text-foreground"
-                  : "bg-secondary/50 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
-              }`}>
-              {p.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap gap-1">
+            {efficiencyPresets.map((p) => (
+              <button key={p.label} type="button" title={p.title}
+                onClick={() => update("efficiency", p.value)}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                  hosting.efficiency === p.value
+                    ? "bg-primary/10 border-primary/40 text-foreground"
+                    : "bg-secondary/50 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                }`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <InputGroup className="h-7 w-20 ml-auto">
+            <InputGroupInput type="number" min={1} max={100}
+              value={hosting.efficiency ?? "80"}
+              onChange={(e) => update("efficiency", e.target.value)}
+              className="text-xs" />
+            <InputGroupAddon align="inline-end">%</InputGroupAddon>
+          </InputGroup>
         </div>
-        <InputGroup className="h-7 w-20 shrink-0">
-          <InputGroupInput type="number" min={1} max={100}
-            value={hosting.efficiency ?? "80"}
-            onChange={(e) => update("efficiency", e.target.value)}
-            className="text-xs" />
-          <InputGroupAddon align="inline-end">%</InputGroupAddon>
-        </InputGroup>
       </div>
 
       {/* Memory fits */}
@@ -489,7 +508,7 @@ export function AvailableHardware({
 
       {/* ── Storage ─────────────────────────────────────────────────────── */}
       <SectionLabel>Storage</SectionLabel>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <Field label="Capacity (GB)" tooltip="Free disk space available for the model and OS.">
           <InputGroup className="h-7">
             <InputGroupInput type="number" placeholder="e.g. 500" value={availableStorage}

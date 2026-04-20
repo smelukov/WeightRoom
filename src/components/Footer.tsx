@@ -136,6 +136,59 @@ export function Footer() {
                 note="The ×1.05 is the on-disk equivalent of the ×1.1 RAM overhead — slightly smaller because GGUF packs unquantized tensors more densely. OS overhead covers a minimal Linux installation."
               />
 
+              {/* Limitations / accuracy of TPS estimates */}
+              <div className="space-y-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
+                <div className="text-[11px] font-medium text-foreground">
+                  Limitations &mdash; treat TPS as an upper bound
+                </div>
+                <p className="text-[10px] text-muted-foreground/90">
+                  TPS is computed from a <strong>roof-line model</strong>: it
+                  assumes inference is purely bandwidth-bound (the GPU spends
+                  100% of its time streaming weights and KV cache from memory).
+                  Real engines never quite reach that limit. Specifically, the
+                  numbers <em>do not</em> account for:
+                </p>
+                <ul className="text-[10px] text-muted-foreground/90 list-disc pl-4 space-y-0.5">
+                  <li>
+                    Compute-bound phases (prefill, attention math) &mdash; only
+                    the decode step is modelled.
+                  </li>
+                  <li>
+                    Multi-GPU overhead &mdash; tensor / pipeline parallel
+                    collectives, NVLink synchronisation, all-reduce latency.
+                  </li>
+                  <li>
+                    MoE expert routing latency and load imbalance across GPUs.
+                  </li>
+                  <li>
+                    Kernel launch overhead, dequantisation cost, scheduler /
+                    runtime overhead.
+                  </li>
+                </ul>
+                <p className="text-[10px] text-muted-foreground/90">
+                  Rule of thumb &mdash; real throughput is typically:
+                </p>
+                <ul className="text-[10px] text-muted-foreground/90 list-disc pl-4 space-y-0.5">
+                  <li>
+                    <strong>60&ndash;90%</strong> of estimate for dense models on
+                    a single GPU
+                  </li>
+                  <li>
+                    <strong>40&ndash;60%</strong> for multi-GPU dense (tensor
+                    parallel)
+                  </li>
+                  <li>
+                    <strong>20&ndash;40%</strong> for multi-GPU MoE (DeepSeek V3,
+                    Mixtral &times;N)
+                  </li>
+                </ul>
+                <p className="text-[10px] text-muted-foreground/70 italic">
+                  Use the numbers for sizing decisions ("does this fit?", "is
+                  config A faster than config B?"), not as a substitute for real
+                  benchmarks.
+                </p>
+              </div>
+
               {/* Supported formats */}
               <div className="space-y-2">
                 <div className="text-[11px] font-medium text-foreground">

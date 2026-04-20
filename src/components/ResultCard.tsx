@@ -113,7 +113,7 @@ export function ResultCard({ result, disk, kvFormula, concurrentUsers = 1, kvCac
   return (
     <div className="grid grid-cols-2 divide-x divide-border text-center">
       {/* RAM column */}
-      <div className="pr-4 space-y-3">
+      <div className="min-w-0 pr-4 space-y-3">
         <div>
           <div className="flex items-center justify-center gap-1.5">
             <div className="text-sm text-muted-foreground uppercase tracking-wider">
@@ -180,7 +180,7 @@ export function ResultCard({ result, disk, kvFormula, concurrentUsers = 1, kvCac
       </div>
 
       {/* Storage column */}
-      <div className="pl-4 space-y-3">
+      <div className="min-w-0 pl-4 space-y-3">
         <div>
           <div className="text-sm text-muted-foreground uppercase tracking-wider">
             Storage
