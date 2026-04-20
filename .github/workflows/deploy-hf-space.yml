@@ -1,0 +1,97 @@
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches: [main]
+  # Manual re-deploy from the Actions tab — handy when only .hf-space/README.md
+  # (Space metadata) changes and you want to push it without a code change.
+  workflow_dispatch:
+
+# Explicit minimum permissions. We only read the repo (checkout) — no writes
+# back to GitHub. Forces any future supply-chain attack via Action update to
+# fail loudly instead of silently escalating.
+permissions:
+  contents: read
+
+# Hugging Face accepts only one commit at a time per repo. If two pushes land
+# back-to-back we want the latest one to win, not collide on push.
+concurrency:
+  group: hf-space-deploy
+  cancel-in-progress: true
+
+env:
+  # Single source of truth for the target Space. Change here if the Space is
+  # ever renamed / migrated to an org.
+  HF_REPO: smelukov/WeightRoom
+
+jobs:
+  deploy:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fail fast with a clear message if the secret is missing, instead of
+      # letting `hf upload` blow up 5 minutes into the build with a 401.
+      - name: Verify HF_TOKEN is configured
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "${HF_TOKEN}" ]; then
+            echo "::error::HF_TOKEN secret is not set." \
+                 "Add it at Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # HF Static Spaces serve from the root, no subpath. Keep this distinct
+          # from the GitHub Pages workflow (which uses /WeightRoom/).
+          VITE_BASE: /
+
+      # The HF Space README (with YAML frontmatter) lives separately so it
+      # survives `vite build` (which wipes dist/). Copying it in at deploy time
+      # also means metadata changes go through PR review like any other file.
+      - name: Copy HF Space README into dist
+        run: cp .hf-space/README.md dist/README.md
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Hugging Face Hub CLI
+        run: pip install -U "huggingface_hub[cli]"
+
+      # `--delete "*"` makes each deploy a clean replace. Without it, every
+      # build leaves behind old hashed bundles (Vite changes the hash on every
+      # rebuild) and the Space slowly bloats. HF performs the delete and the
+      # new uploads in a single atomic commit, so the Space never serves a
+      # broken half-state.
+      - name: Upload to HF Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          hf upload "${HF_REPO}" dist . \
+            --repo-type space \
+            --delete "*" \
+            --commit-message "Deploy ${GITHUB_SHA::7} from ${GITHUB_REF_NAME}"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deployed to Hugging Face Space"
+            echo ""
+            echo "🔗 https://huggingface.co/spaces/${HF_REPO}"
+            echo ""
+            echo "Commit: \`${GITHUB_SHA::7}\` from \`${GITHUB_REF_NAME}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
