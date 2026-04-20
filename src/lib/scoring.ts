@@ -19,9 +19,12 @@ export function normalizeScores(scores: number[]): number[] {
  * Get color from a normalized score (0-1 range) on a red→yellow→green gradient.
  */
 export function getValueColor(normalized: number): string {
-  // HSL interpolation: red (0°) → yellow (60°) → green (120°)
-  const hue = normalized * 120; // 0=red, 60=yellow, 120=green
-  return `hsl(${hue}, 85%, 50%)`;
+  // HSL interpolation: red (0°) → yellow (60°) → green (120°).
+  // Saturation 65% (down from 85%) and lightness 45% are tuned to stay
+  // legible on a white background without "vibrating" — 85%/50% reads as
+  // an oversaturated bootstrap warning on light themes.
+  const hue = normalized * 120;
+  return `hsl(${hue}, 65%, 45%)`;
 }
 
 export interface TpsLabel {
@@ -35,9 +38,9 @@ export interface TpsLabel {
  */
 export function getTpsLabel(tps: number | null): TpsLabel | null {
   if (tps == null || tps <= 0) return null;
-  if (tps < 1) return { label: "Very slow", color: "text-red-400" };
-  if (tps < 5) return { label: "Slow", color: "text-amber-400" };
-  if (tps < 15) return { label: "Moderate", color: "text-orange-300" };
-  if (tps < 30) return { label: "Good", color: "text-emerald-400" };
-  return { label: "Fast", color: "text-emerald-300" };
+  if (tps < 1) return { label: "Very slow", color: "text-danger" };
+  if (tps < 5) return { label: "Slow", color: "text-warning" };
+  if (tps < 15) return { label: "Moderate", color: "text-warning" };
+  if (tps < 30) return { label: "Good", color: "text-success" };
+  return { label: "Fast", color: "text-success" };
 }

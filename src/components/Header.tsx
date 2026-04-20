@@ -1,30 +1,74 @@
 import { Button } from "@/components/ui/button";
-import { LuCamera, LuLoader, LuShare2, LuTrash2 } from "react-icons/lu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  LuCamera,
+  LuCheck,
+  LuClipboard,
+  LuDownload,
+  LuLoader,
+  LuShare2,
+  LuTrash2,
+} from "react-icons/lu";
 import { SiGithub } from "react-icons/si";
 import { useState } from "react";
+import { ThemeToggle } from "./ThemeToggle";
 
 const REPO_URL = "https://github.com/smelukov/WeightRoom";
+
+/** Shared style for square icon-only header buttons. Centralised so all
+ *  utility actions in the toolbar (Share, Screenshot, Clear, GitHub, theme)
+ *  share the same hit-area, padding, hover treatment, and ARIA shape. */
+const ICON_BUTTON_CLASS =
+  "flex items-center justify-center w-8 h-8 text-xs rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors disabled:opacity-50";
 
 interface HeaderProps {
   mode: "single" | "compare";
   onModeChange: (mode: "single" | "compare") => void;
   canClear?: boolean | undefined;
   onClear?: (() => void) | undefined;
-  // Returning a Promise is fine — handler is `await`-ed in the click handler
-  // and we never inspect the result. Allowing both shapes keeps callers free
-  // to pass either sync or async screenshot logic.
-  onScreenshot?: (() => void | Promise<void>) | undefined;
+  /** Action chosen from the screenshot dropdown. May return a promise so
+   *  callers can keep their busy-state in sync; the result is not inspected. */
+  onScreenshot?:
+    | ((action: "save" | "copy") => void | Promise<void>)
+    | undefined;
   screenshotCapturing?: boolean | undefined;
 }
 
-export function Header({ mode, onModeChange, canClear, onClear, onScreenshot, screenshotCapturing }: HeaderProps) {
+export function Header({
+  mode,
+  onModeChange,
+  canClear,
+  onClear,
+  onScreenshot,
+  screenshotCapturing,
+}: HeaderProps) {
   const [copied, setCopied] = useState(false);
+  const [screenshotResult, setScreenshotResult] = useState<
+    "saved" | "copied" | null
+  >(null);
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  };
+
+  const handleScreenshotAction = async (action: "save" | "copy") => {
+    if (!onScreenshot) return;
+    await onScreenshot(action);
+    setScreenshotResult(action === "save" ? "saved" : "copied");
+    setTimeout(() => setScreenshotResult(null), 2000);
   };
 
   return (
@@ -57,47 +101,119 @@ export function Header({ mode, onModeChange, canClear, onClear, onScreenshot, sc
             Compare
           </Button>
         </div>
-        <button
-          onClick={handleShare}
-          title="Copy link to share"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
-        >
-          <LuShare2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          <span className="hidden sm:inline">{copied ? "Copied!" : "Share"}</span>
-        </button>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                onClick={handleShare}
+                aria-label={copied ? "Copied!" : "Copy share link"}
+                className={ICON_BUTTON_CLASS}
+              >
+                {copied ? (
+                  <LuCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                ) : (
+                  <LuShare2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                )}
+              </button>
+            }
+          />
+          <TooltipContent>{copied ? "Copied!" : "Copy share link"}</TooltipContent>
+        </Tooltip>
+
         {onScreenshot && (
-          <button
-            onClick={onScreenshot}
-            disabled={screenshotCapturing}
-            title="Save screenshot of all cards and charts"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors disabled:opacity-50"
-          >
-            {screenshotCapturing
-              ? <LuLoader className="w-3.5 h-3.5 shrink-0 animate-spin" aria-hidden="true" />
-              : <LuCamera className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
-            <span className="hidden sm:inline">Screenshot</span>
-          </button>
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <DropdownMenuTrigger
+                    aria-label={
+                      screenshotResult === "saved"
+                        ? "Saved!"
+                        : screenshotResult === "copied"
+                          ? "Copied!"
+                          : "Save or copy screenshot"
+                    }
+                    disabled={screenshotCapturing}
+                    className={ICON_BUTTON_CLASS}
+                  >
+                    {screenshotCapturing ? (
+                      <LuLoader
+                        className="w-3.5 h-3.5 shrink-0 animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : screenshotResult ? (
+                      <LuCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <LuCamera className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    )}
+                  </DropdownMenuTrigger>
+                }
+              />
+              <TooltipContent>
+                {screenshotResult === "saved"
+                  ? "Saved!"
+                  : screenshotResult === "copied"
+                    ? "Copied to clipboard"
+                    : "Screenshot"}
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" sideOffset={6} className="min-w-[10rem]">
+              <DropdownMenuItem
+                onClick={() => handleScreenshotAction("save")}
+                className="gap-2"
+              >
+                <LuDownload className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                <span>Save as PNG</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleScreenshotAction("copy")}
+                className="gap-2"
+              >
+                <LuClipboard className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                <span>Copy to clipboard</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
+
         {canClear && onClear && (
-          <button
-            onClick={onClear}
-            title="Clear all configurations"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border text-muted-foreground hover:text-red-400 hover:border-red-400/50 transition-colors"
-          >
-            <LuTrash2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            <span className="hidden sm:inline">Clear all</span>
-          </button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={onClear}
+                  aria-label="Clear all configurations"
+                  className={`${ICON_BUTTON_CLASS} hover:text-destructive hover:border-destructive/50`}
+                >
+                  <LuTrash2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                </button>
+              }
+            />
+            <TooltipContent>Clear all</TooltipContent>
+          </Tooltip>
         )}
-        <a
-          href={REPO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="View source on GitHub"
-          aria-label="View source on GitHub"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
-        >
-          <SiGithub className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-        </a>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <a
+                href={REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View source on GitHub"
+                className={ICON_BUTTON_CLASS}
+              >
+                <SiGithub className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              </a>
+            }
+          />
+          <TooltipContent>View source on GitHub</TooltipContent>
+        </Tooltip>
+
+        <ThemeToggle />
       </div>
     </header>
   );

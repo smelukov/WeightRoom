@@ -26,23 +26,26 @@ export function RamBudget({
   const statusConfig = {
     fits: {
       label: "Fits comfortably",
-      color: "text-emerald-400",
-      bg: "bg-emerald-400/10 border-emerald-400/20",
+      color: "text-success-foreground",
+      bg: "bg-success-soft border-success/30",
+      bar: "bg-success",
       icon: "\u2713",
     },
     tight: {
       label: "Tight fit",
-      color: "text-amber-400",
-      bg: "bg-amber-400/10 border-amber-400/20",
+      color: "text-warning-foreground",
+      bg: "bg-warning-soft border-warning/30",
+      bar: "bg-warning",
       icon: "\u26A0",
     },
     exceeds: {
       label: "Exceeds available RAM",
-      color: "text-red-400",
-      bg: "bg-red-400/10 border-red-400/20",
+      color: "text-danger-foreground",
+      bg: "bg-danger-soft border-danger/30",
+      bar: "bg-danger",
       icon: "\u2717",
     },
-  };
+  } as const;
 
   return (
     <div className="space-y-3">
@@ -71,16 +74,10 @@ export function RamBudget({
         </div>
       )}
 
-      {hasRam && (
+      {hasRam && status && (
         <div className="relative h-3 rounded-full bg-secondary overflow-hidden">
           <div
-            className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
-              status === "fits"
-                ? "bg-emerald-500"
-                : status === "tight"
-                  ? "bg-amber-500"
-                  : "bg-red-500"
-            }`}
+            className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${statusConfig[status].bar}`}
             style={{ width: `${Math.min(100, (totalGb / ramNum) * 100)}%` }}
           />
         </div>

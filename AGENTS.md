@@ -104,6 +104,8 @@ The regex must stop at `?`, `#`, and whitespace. Do not simplify it to `[^/]+` �
 | `hooks/useValueScore.ts` | Memoized TPS / value score for a card config | No side effects, no fetch |
 | `hooks/useHfModelImport.ts` | HF fetch flow with loading/error/warning state | No JSX, no URL state |
 | `components/ConcurrentUsersInput.tsx` | Users + engine dropdowns; delegates "which preset is active" to `resolveActiveEngine` | No formulas; must NOT export non-component values (kills react-refresh) |
+| `components/ThemeProvider.tsx` | Single `next-themes` wrapper with project defaults (`attribute="class"`, `defaultTheme="system"`, `storageKey="theme"`) | No JSX beyond the provider; do not import elsewhere — wrap `<App />` once in `main.tsx` |
+| `components/ThemeToggle.tsx` | DropdownMenu Light / Dark / System, lives in `Header` | No theme logic of its own — must read/write through `useTheme()` only |
 
 > **`components/ui/*`** — shadcn/ui primitives, configured via `components.json` (style `base-nova`, alias `@/components/ui`). To add a new primitive run `npx shadcn add <name>` — do NOT hand-write or hand-edit files in `ui/`, otherwise `npx shadcn diff` / future upgrades will silently overwrite your changes. If you really need a project-specific tweak, wrap the primitive in a sibling component (e.g. `InfoTooltip.tsx` wraps `ui/tooltip`).
 
@@ -117,6 +119,28 @@ Single source for all icons in **our** code: [`react-icons`](https://react-icons
 - Do NOT add `lucide-react` imports to files outside `src/components/ui/*`. `lucide-react` stays in `dependencies` only because shadcn/ui primitives import from it directly — the rest of the codebase uses `react-icons` so we keep one icon convention everywhere.
 - Avoid inline `<svg>` markup in components — search `react-icons/{lu,si,md,fa,hi}` first; if nothing fits, add a tiny wrapper component in `src/components/icons/` rather than copy-pasting raw paths into JSX.
 - The only **legitimate** inline `<svg>` in the codebase lives in `BrandIcon.tsx` (Microsoft / DeepSeek). They are intentionally absent from Simple Icons due to trademark restrictions, so we ship custom replicas. Brand colours for the rest are mirrored from the simple-icons palette and live next to `BRAND_ICONS` — that lets us keep `react-icons/si` as the single brand-icon source and avoid a separate `simple-icons` dependency.
+
+### Design tokens
+
+All colours go through CSS custom properties defined in `src/index.css`. Tailwind utilities such as `bg-success`, `text-info`, `border-cat-vision/30` resolve to these tokens at build-time via the `@theme inline {…}` mapping. Both light and dark themes provide values for every token — that is what makes the theme switcher work without per-component conditionals.
+
+| Token group | Tokens | When to use |
+|---|---|---|
+| Surface | `background`, `foreground`, `card`, `popover`, `muted`, `secondary`, `accent`, `border`, `input`, `ring` | Default chrome — same as shadcn defaults |
+| Brand | `primary`, `primary-foreground` | Emphasised actions, focus rings, brand chips |
+| Status | `success`, `warning`, `danger`, `info` (+ `*-foreground`, `*-soft`) | Fits / tight / exceeds states; informational plates (Hosting, HF Import, hardware section). `*-soft` = tinted background for plates / chips, `*-foreground` = readable text on a soft background |
+| Categorical (decorative) | `cat-vision`, `cat-reasoning`, `cat-tools` (+ `*-soft`) | Capability badges only |
+| Chart series | `chart-1` … `chart-5` | Stacked / categorical data series in `ResultCard`, comparison views |
+| Destructive | `destructive` | Existing shadcn slot — keep using it for destructive button hovers (Clear all) |
+
+**Hard rule:** do NOT introduce hardcoded Tailwind palette classes (`bg-emerald-400`, `text-sky-300`, `border-violet-500/30`, …) in components. They look fine in dark mode and break in light. If a needed shade does not exist as a token, **add the token** in both `:root` and `.dark` plus the `@theme inline {…}` mapping; do not paper over with one-off colours.
+
+### Theming
+
+- The provider lives in `src/components/ThemeProvider.tsx` and is mounted exactly once around `<App />` in `src/main.tsx`.
+- Storage key is `"theme"` and the value is one of `"light" | "dark" | "system"`. `index.html` ships an inline anti-flash bootstrap that reads the same key BEFORE first paint and applies `class="light"` / `class="dark"` to `<html>` so there is no flash of incorrect theme. Any change to the storage key must be mirrored in BOTH `ThemeProvider`'s `storageKey` AND the inline script in `index.html` — they are two halves of one contract.
+- Every new colour must work in both themes. The fastest way to check: open the page, click the theme toggle, and look at the affected component. If a status chip becomes invisible on white, you used a token (`bg-success-soft`) without a matching `text-success-foreground` on the text — fix the contrast inside the token, not in the consumer.
+- Add a new semantic token in three places: `:root { --foo: oklch(...) }`, `.dark { --foo: oklch(...) }`, and `@theme inline { --color-foo: var(--foo) }`. Tailwind autogenerates `bg-foo`, `text-foo`, `border-foo` after that — no extra config needed.
 
 ## Testing Conventions
 
@@ -161,6 +185,8 @@ Single source for all icons in **our** code: [`react-icons`](https://react-icons
 - [ ] If a formula changed: both `calcLLMRam` and `calcValueScore` updated consistently
 - [ ] If a new model added: `displayName`, `brand`, and `hfRepoId` are set; MoE follows the `<Total>B-A<Active>B (MoE)` naming convention
 - [ ] If `engineId` / `kvCacheFillPct` touched: parent updates BOTH in one `setState`
+- [ ] No hardcoded Tailwind palette classes (`bg-emerald-400`, `text-sky-300`, …) — use semantic tokens (`bg-success`, `text-info`)
+- [ ] If a new component has theme-sensitive colours: visually verified in **both** Light and Dark
 - [ ] No `any` types introduced, no non-null assertions (`!`)
 - [ ] No `console.log` left in production code
 

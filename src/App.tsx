@@ -9,7 +9,11 @@ import { Header } from "@/components/Header";
 import { ConfigCard } from "@/components/ConfigCard";
 import { ComparisonPanel } from "@/components/ComparisonPanel";
 import { Footer } from "@/components/Footer";
-import { downloadScreenshot, buildCompareFilename } from "@/lib/screenshot";
+import {
+  downloadScreenshot,
+  copyScreenshotToClipboard,
+  buildCompareFilename,
+} from "@/lib/screenshot";
 import type { CardData } from "@/lib/types";
 import { encodeState, decodeState } from "@/lib/state";
 import type { SavedState } from "@/lib/state";
@@ -130,18 +134,28 @@ export default function App() {
   const compareRef = useRef<HTMLDivElement>(null);
   const [compareCapturing, setCompareCapturing] = useState(false);
 
-  const handleCompareScreenshot = useCallback(async () => {
-    if (!compareRef.current || compareCapturing) return;
-    setCompareCapturing(true);
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
-    try {
-      await downloadScreenshot(compareRef.current, buildCompareFilename());
-    } finally {
-      setCompareCapturing(false);
-    }
-  }, [compareCapturing]);
+  const handleCompareScreenshot = useCallback(
+    async (action: "save" | "copy") => {
+      if (!compareRef.current || compareCapturing) return;
+      setCompareCapturing(true);
+      // Two RAF flushes: gives the layout engine a chance to repaint after
+      // we set the busy flag (button switches to spinner) so the spinner
+      // itself does not end up in the captured PNG.
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      try {
+        if (action === "save") {
+          await downloadScreenshot(compareRef.current, buildCompareFilename());
+        } else {
+          await copyScreenshotToClipboard(compareRef.current);
+        }
+      } finally {
+        setCompareCapturing(false);
+      }
+    },
+    [compareCapturing],
+  );
 
   return (
     <TooltipProvider>

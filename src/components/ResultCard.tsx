@@ -1,12 +1,11 @@
 import type { CalcResult, KvFormula } from "@/lib/types";
 import type { DiskResult } from "@/lib/calculator";
-
-const KV_FORMULA_LABELS: Record<KvFormula, string> = {
-  standard: "Standard GQA",
-  hybrid: "Sliding Window",
-  mla: "MLA",
-  linear_hybrid: "Linear + Full",
-};
+import { KV_FORMULA_DETAILS } from "@/lib/kvFormulas";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ResultCardProps {
   result: CalcResult;
@@ -20,14 +19,14 @@ interface ResultCardProps {
 }
 
 const BASE_RAM_SEGMENTS = [
-  { key: "weightsGb" as const, label: "Weights", color: "bg-blue-500" },
-  { key: "kvCacheGb" as const, label: "KV Cache", color: "bg-purple-500" },
-  { key: "osOverheadGb" as const, label: "OS", color: "bg-slate-500" },
+  { key: "weightsGb" as const, label: "Weights", color: "bg-chart-1" },
+  { key: "kvCacheGb" as const, label: "KV Cache", color: "bg-chart-2" },
+  { key: "osOverheadGb" as const, label: "OS", color: "bg-chart-3" },
 ];
 
 const diskSegments = [
-  { key: "modelFileGb" as const, label: "Model", color: "bg-teal-500" },
-  { key: "osOverheadGb" as const, label: "OS", color: "bg-slate-500" },
+  { key: "modelFileGb" as const, label: "Model", color: "bg-chart-4" },
+  { key: "osOverheadGb" as const, label: "OS", color: "bg-chart-3" },
 ];
 
 function BreakdownCard({
@@ -121,9 +120,34 @@ export function ResultCard({ result, disk, kvFormula, concurrentUsers = 1, kvCac
               RAM
             </div>
             {kvFormula && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground/70 font-medium">
-                {KV_FORMULA_LABELS[kvFormula]}
-              </span>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      // The badge is a tooltip trigger, not a navigational
+                      // control — it does not perform an action on click.
+                      // Using <button> (not <span>) keeps it focusable so
+                      // keyboard users can read the formula description.
+                      aria-label={`KV cache formula: ${KV_FORMULA_DETAILS[kvFormula].label}`}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground font-medium hover:text-foreground transition-colors cursor-help"
+                    >
+                      {KV_FORMULA_DETAILS[kvFormula].label}
+                    </button>
+                  }
+                />
+                <TooltipContent className="max-w-xs">
+                  <div className="space-y-1">
+                    <div className="font-mono text-[10px] opacity-80">
+                      {KV_FORMULA_DETAILS[kvFormula].formula}
+                    </div>
+                    <div className="opacity-70">
+                      {KV_FORMULA_DETAILS[kvFormula].models}
+                    </div>
+                    <div>{KV_FORMULA_DETAILS[kvFormula].note}</div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
           <div className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">

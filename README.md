@@ -18,6 +18,7 @@ A web calculator that estimates RAM, storage, and token throughput (TPS) for run
 - **URL sharing** — full state (model, quant, context, hosting) serialized to `?s=` URL parameter (backward-compatibility guarded by golden-URL tests)
 - **Quantization support** — Q1 / Q2 / Q3 / Q4 / Q5 / Q6 / Q8 / FP16 / BF16 / FP32 for both weights and KV cache
 - **Concurrent users + inference engine** — KV cache scales by parallel slots and engine pre-allocation strategy (llama.cpp / Ollama / MLX = 100% reservation; vLLM / SGLang / TGI PagedAttention ≈ 25%; TensorRT-LLM ≈ 30%; or a custom %)
+- **Light / Dark / System theme** — `next-themes` switcher in the header, with an inline anti-flash bootstrap so the page never paints in the wrong theme. All component colours go through semantic design tokens (`success`, `warning`, `info`, `cat-vision`, …) defined in `src/index.css`, so adding a new colour automatically works in both themes
 
 ## KV Cache Formulas
 
@@ -120,8 +121,10 @@ src/
     CapabilityBadges.tsx     # VLM / Thinking / Tool-use capability pills
     ConcurrentUsersInput.tsx # parallel users + inference-engine controls
     InfoTooltip.tsx          # accessible "?" tooltip wrapper
-    Header.tsx               # app title, mode toggle, share/screenshot buttons
+    Header.tsx               # app title, mode toggle, share/screenshot buttons + theme toggle
     Footer.tsx               # expandable "How calculations work" panel
+    ThemeProvider.tsx        # next-themes wrapper (mounted once around <App />)
+    ThemeToggle.tsx          # Light / Dark / System dropdown shown in the header
     comparison/
       ModelsChart.tsx        # Memory/Speed bar chart
       HostingDetailsView.tsx # per-provider bar charts + fit status
@@ -129,11 +132,13 @@ src/
       utils.ts               # shared chart helpers and constants
     __tests__/
       ConcurrentUsersInput.test.tsx # presets, custom mode, dropdown UX, resolveActiveEngine
+      ThemeToggle.test.tsx          # Light / Dark / System persistence + class application
 e2e/
   single.spec.ts
   compare.spec.ts
   share.spec.ts
   hf-import.spec.ts
+  theme.spec.ts                # theme switcher: default, persistence, system tracking
 .github/workflows/
   ci.yml                 # CыI jobs: lint, typecheck, unit (with coverage), build, e2e
 .husky/
@@ -153,6 +158,7 @@ Tests are a first-class citizen — every PR is gated by CI (`lint`, `typecheck`
 - `**hooks/useCalcResult**`, `**useValueScore**` — byte-for-byte match with the underlying calc functions, memoization stability, recomputation on input changes
 - `**hooks/useHfModelImport**` — race conditions (stale responses discarded), unmount safety, **StrictMode regression** (`mountedRef` re-init on remount)
 - `**components/ConcurrentUsersInput`** — preset matching, custom mode, dropdown UX (real `user-event` clicks), `resolveActiveEngine` truth table incl. backward-compat for legacy URLs without `engineId`
+- `**components/ThemeToggle`** — that picking Light / Dark / System actually toggles the `.dark` class on `<html>` and writes the right value to `localStorage` (no shortcut: real `next-themes` provider)
 
 **E2E tests** (`e2e/`) cover:
 
@@ -160,6 +166,7 @@ Tests are a first-class citizen — every PR is gated by CI (`lint`, `typecheck`
 - Compare mode: chart visibility, card isolation, card limit
 - URL sharing: state persistence across tabs
 - HF import: network mocking, BF16 detection, error messages
+- Theme switcher: default follows OS, Light / Dark choices persist across reload, System tracks `prefers-color-scheme` changes live
 
 ## Contributing
 

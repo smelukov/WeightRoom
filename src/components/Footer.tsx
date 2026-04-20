@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { LuChevronDown } from "react-icons/lu";
+import { KV_FORMULA_DETAILS } from "@/lib/kvFormulas";
 
 // NOTE: When you change a formula in src/lib/calculator.ts, update the
 // matching FormulaBlock / FormulaCard below. The footer is the only place
 // where the math is exposed to end-users — drift here means users will
 // scratch their heads at numbers they can't reproduce.
+// KV-cache formula descriptions live in `src/lib/kvFormulas.ts` so the
+// in-card tooltip and this footer stay in sync.
 
 export function Footer() {
   const [open, setOpen] = useState(false);
@@ -56,30 +59,19 @@ export function Footer() {
                   bytes = KV-cache element size (e.g. 2 for FP16). Multiplied by concurrent users × fill %.
                 </p>
                 <div className="grid sm:grid-cols-2 gap-2">
-                  <FormulaCard
-                    label="Standard GQA"
-                    models="Llama, Qwen 2.5, Mistral, Phi"
-                    formula="2 × L × KV_H × H_D × T × bytes"
-                    note="The ×2 stores K and V separately. Linear in context length."
-                  />
-                  <FormulaCard
-                    label="Sliding Window (hybrid)"
-                    models="Gemma 2 / 3 / 4"
-                    formula="sliding_layers × … × min(T, W) + full_layers × … × T"
-                    note="Local-attention layers cap memory at W (sliding window, e.g. 4096). Only every Nth layer keeps a full cache. Gemma 4 also sets attention_k_eq_v=true on dense 31B and the MoE 26B variant — K and V share storage, halving the KV cache."
-                  />
-                  <FormulaCard
-                    label="MLA"
-                    models="DeepSeek V2 / V3 / R1"
-                    formula="L × (kv_lora_rank + qk_rope_dim) × T × bytes"
-                    note="No ×2: K and V share a single low-rank latent projection. ~10–20× smaller than standard GQA."
-                  />
-                  <FormulaCard
-                    label="Linear + Full (linear_hybrid)"
-                    models="Qwen 3.5"
-                    formula="2 × full_layers × KV_H × H_D × T × bytes"
-                    note="Linear-attention layers use a fixed-size recurrent state (≈0 memory). Only sparse full-attention layers grow with T."
-                  />
+                  {(
+                    Object.entries(KV_FORMULA_DETAILS) as Array<
+                      [keyof typeof KV_FORMULA_DETAILS, (typeof KV_FORMULA_DETAILS)[keyof typeof KV_FORMULA_DETAILS]]
+                    >
+                  ).map(([key, info]) => (
+                    <FormulaCard
+                      key={key}
+                      label={info.label}
+                      models={info.models}
+                      formula={info.formula}
+                      note={info.note}
+                    />
+                  ))}
                 </div>
               </div>
 
@@ -177,13 +169,13 @@ export function Footer() {
                 </div>
               </div>
 
-              <p className="text-[10px] text-muted-foreground/70">
+              <p className="text-[10px] text-muted-foreground">
                 Architecture parameters are pulled from HuggingFace{" "}
-                <code className="bg-secondary px-1 rounded">config.json</code>.
-                Use <code className="bg-secondary px-1 rounded">num_key_value_heads</code>{" "}
+                <code className="bg-muted px-1 rounded">config.json</code>.
+                Use <code className="bg-muted px-1 rounded">num_key_value_heads</code>{" "}
                 (not total heads) for GQA models. For MoE, active params are estimated from{" "}
-                <code className="bg-secondary px-1 rounded">num_experts_per_tok</code> ×{" "}
-                <code className="bg-secondary px-1 rounded">moe_intermediate_size</code> when available,
+                <code className="bg-muted px-1 rounded">num_experts_per_tok</code> ×{" "}
+                <code className="bg-muted px-1 rounded">moe_intermediate_size</code> when available,
                 otherwise from a ratio heuristic.
               </p>
             </div>
@@ -206,10 +198,10 @@ function FormulaBlock({
   return (
     <div>
       <div className="text-[11px] font-medium text-foreground">{title}</div>
-      <code className="text-[11px] bg-secondary/70 px-1.5 py-0.5 rounded inline-block mt-0.5">
+      <code className="text-[11px] bg-muted px-1.5 py-0.5 rounded inline-block mt-0.5">
         {formula}
       </code>
-      {note && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{note}</p>}
+      {note && <p className="text-[10px] text-muted-foreground mt-0.5">{note}</p>}
     </div>
   );
 }
@@ -226,13 +218,13 @@ function FormulaCard({
   note?: string;
 }) {
   return (
-    <div className="rounded-md bg-secondary/40 border border-border/50 p-2 space-y-0.5">
+    <div className="rounded-md bg-muted border border-border p-2 space-y-0.5">
       <div className="text-[11px] font-medium text-foreground leading-tight">{label}</div>
-      <div className="text-[10px] text-muted-foreground/70">{models}</div>
-      <code className="text-[10px] bg-secondary/70 px-1 py-0.5 rounded inline-block">
+      <div className="text-[10px] text-muted-foreground">{models}</div>
+      <code className="text-[10px] bg-background/60 px-1 py-0.5 rounded inline-block">
         {formula}
       </code>
-      {note && <p className="text-[10px] text-muted-foreground/70">{note}</p>}
+      {note && <p className="text-[10px] text-muted-foreground">{note}</p>}
     </div>
   );
 }

@@ -39,14 +39,14 @@ const OS_PRESETS = [
 ];
 
 const statusConfig = {
-  fits: { label: "Fits", color: "text-emerald-400", bar: "bg-emerald-500", icon: "✓" },
-  tight: { label: "Tight", color: "text-amber-400", bar: "bg-amber-500", icon: "⚠" },
-  exceeds: { label: "Exceeds", color: "text-red-400", bar: "bg-red-500", icon: "✗" },
-};
+  fits: { label: "Fits", color: "text-success-foreground", bar: "bg-success", icon: "✓" },
+  tight: { label: "Tight", color: "text-warning-foreground", bar: "bg-warning", icon: "⚠" },
+  exceeds: { label: "Exceeds", color: "text-danger-foreground", bar: "bg-danger", icon: "✗" },
+} as const;
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[10px] text-muted-foreground uppercase tracking-wider pt-1 border-t border-sky-800/20">
+    <div className="text-[10px] text-muted-foreground uppercase tracking-wider pt-1 border-t border-border">
       {children}
     </div>
   );
@@ -204,7 +204,7 @@ export function AvailableHardware({
   ] as const;
 
   const header = (
-    <div className="flex items-center gap-1.5 text-xs font-medium text-sky-400 uppercase tracking-wider">
+    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
       <LuCpu className="w-3.5 h-3.5" aria-hidden="true" />
       Available Hardware
       <InfoTooltip content="Enter your machine specs to check if the model fits and estimate inference speed." />
@@ -221,7 +221,7 @@ export function AvailableHardware({
       : ramNum;
     const requiredGb = hasGPU ? modelMemoryGb : totalRamGb;
     return (
-      <div className="space-y-3 p-3 rounded-lg bg-sky-950/30 border border-sky-800/30">
+      <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-border">
         {header}
         <div className="grid grid-cols-2 gap-3">
           {/* RAM + VRAM */}
@@ -322,7 +322,7 @@ export function AvailableHardware({
                   onClick={() => onOsOverheadGbChange(p.value)}
                   className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
                     osOverheadGb === p.value
-                      ? "bg-sky-500/20 border-sky-500/50 text-sky-300"
+                      ? "bg-primary/10 border-primary/40 text-foreground"
                       : "bg-secondary/50 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
                   }`}>
                   {p.label}
@@ -349,7 +349,7 @@ export function AvailableHardware({
 
   // ── Full hosting layout ──────────────────────────────────────────────────
   return (
-    <div className="space-y-3 p-3 rounded-lg bg-sky-950/30 border border-sky-800/30">
+    <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-border">
       {header}
 
       {/* Provider + Price */}
@@ -437,7 +437,7 @@ export function AvailableHardware({
               onClick={() => onOsOverheadGbChange(p.value)}
               className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
                 osOverheadGb === p.value
-                  ? "bg-sky-500/20 border-sky-500/50 text-sky-300"
+                  ? "bg-primary/10 border-primary/40 text-foreground"
                   : "bg-secondary/50 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
               }`}>
               {p.label}
@@ -464,7 +464,7 @@ export function AvailableHardware({
               onClick={() => update("efficiency", p.value)}
               className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
                 hosting.efficiency === p.value
-                  ? "bg-sky-500/20 border-sky-500/50 text-sky-300"
+                  ? "bg-primary/10 border-primary/40 text-foreground"
                   : "bg-secondary/50 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
               }`}>
               {p.label}

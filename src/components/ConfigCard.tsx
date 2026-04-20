@@ -11,10 +11,31 @@ import { Separator } from "@/components/ui/separator";
 import { calcDisk } from "@/lib/calculator";
 import { resolveModel } from "@/lib/calcInput";
 import { KNOWN_MODELS } from "@/lib/models";
-import { downloadScreenshot, buildCardFilename } from "@/lib/screenshot";
+import {
+  downloadScreenshot,
+  copyScreenshotToClipboard,
+  buildCardFilename,
+} from "@/lib/screenshot";
 import type { CardData, ModelSettings, HostingData } from "@/lib/types";
 import { memo, useRef, useState } from "react";
-import { LuCamera, LuLoader } from "react-icons/lu";
+import {
+  LuCamera,
+  LuCheck,
+  LuClipboard,
+  LuDownload,
+  LuLoader,
+} from "react-icons/lu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useCalcResult } from "@/hooks/useCalcResult";
 import { useValueScore } from "@/hooks/useValueScore";
 
@@ -51,6 +72,9 @@ export const ConfigCard = memo(function ConfigCard({
 
   const [autoImportUrl, setAutoImportUrl] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [screenshotResult, setScreenshotResult] = useState<
+    "saved" | "copied" | null
+  >(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const updateModel = (partial: Partial<ModelSettings>) =>
@@ -58,21 +82,32 @@ export const ConfigCard = memo(function ConfigCard({
   const updateHosting = (partial: Partial<HostingData>) =>
     onChange({ ...config, hosting: { ...config.hosting, ...partial } });
 
-  async function handleScreenshot() {
+  async function handleScreenshot(action: "save" | "copy") {
     if (!cardRef.current || capturing) return;
     setCapturing(true);
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
     try {
-      const modelName =
-        config.model.modelKey === "custom"
-          ? (config.model.customModel.name || "custom")
-          : (knownModel?.displayName ?? config.model.modelKey);
-      await downloadScreenshot(
-        cardRef.current!,
-        buildCardFilename(modelName, config.model.quant, config.model.contextK),
-      );
+      if (action === "save") {
+        const modelName =
+          config.model.modelKey === "custom"
+            ? (config.model.customModel.name || "custom")
+            : (knownModel?.displayName ?? config.model.modelKey);
+        await downloadScreenshot(
+          cardRef.current!,
+          buildCardFilename(
+            modelName,
+            config.model.quant,
+            config.model.contextK,
+          ),
+        );
+        setScreenshotResult("saved");
+      } else {
+        await copyScreenshotToClipboard(cardRef.current!);
+        setScreenshotResult("copied");
+      }
+      setTimeout(() => setScreenshotResult(null), 2000);
     } finally {
       setCapturing(false);
     }
@@ -81,30 +116,80 @@ export const ConfigCard = memo(function ConfigCard({
   return (
     <Card ref={cardRef} className="relative overflow-visible">
       <div className="absolute top-2 right-2 flex items-center gap-0.5">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-          onClick={handleScreenshot}
-          disabled={capturing}
-          title="Save screenshot"
-          aria-label="Save screenshot of this card"
-        >
-          {capturing
-            ? <LuLoader className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-            : <LuCamera className="h-3.5 w-3.5" aria-hidden="true" />}
-        </Button>
-        {onRemove && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-            onClick={onRemove}
-            aria-label="Remove this card"
-            title="Remove card"
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  disabled={capturing}
+                  aria-label={
+                    screenshotResult === "saved"
+                      ? "Saved!"
+                      : screenshotResult === "copied"
+                        ? "Copied!"
+                        : "Save or copy screenshot of this card"
+                  }
+                  className="h-6 w-6 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  {capturing ? (
+                    <LuLoader
+                      className="h-3.5 w-3.5 animate-spin"
+                      aria-hidden="true"
+                    />
+                  ) : screenshotResult ? (
+                    <LuCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <LuCamera className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                </DropdownMenuTrigger>
+              }
+            />
+            <TooltipContent>
+              {screenshotResult === "saved"
+                ? "Saved!"
+                : screenshotResult === "copied"
+                  ? "Copied to clipboard"
+                  : "Screenshot"}
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent
+            align="end"
+            sideOffset={6}
+            className="min-w-[10rem]"
           >
-            <span aria-hidden="true">×</span>
-          </Button>
+            <DropdownMenuItem
+              onClick={() => handleScreenshot("save")}
+              className="gap-2"
+            >
+              <LuDownload className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>Save as PNG</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleScreenshot("copy")}
+              className="gap-2"
+            >
+              <LuClipboard className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>Copy to clipboard</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {onRemove && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={onRemove}
+                  aria-label="Remove this card"
+                >
+                  <span aria-hidden="true">×</span>
+                </Button>
+              }
+            />
+            <TooltipContent>Remove card</TooltipContent>
+          </Tooltip>
         )}
       </div>
       <CardContent className="space-y-4 p-4 sm:p-6">

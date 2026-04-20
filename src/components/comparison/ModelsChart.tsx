@@ -128,7 +128,7 @@ const SpeedTooltip = memo(function SpeedTooltip({
         {isMultiUser && tpsSys != null && (
           <div className="flex items-center justify-between gap-4">
             <span className="text-muted-foreground">System (×{users})</span>
-            <span className="font-semibold text-emerald-400">{fmt(tpsSys)} tok/s</span>
+            <span className="font-semibold text-success">{fmt(tpsSys)} tok/s</span>
           </div>
         )}
       </div>
@@ -186,7 +186,9 @@ export const ModelsChart = memo(function ModelsChart({ configs }: ModelsChartPro
   const hasMulti = data.some((d) => d.concurrentUsers > 1);
   const showSpeed = hasTps;
 
-  const labelColor = "#94a3b8"; // slate-400, readable on dark bg
+  // Recharts inlines `fill` on <text> tags, so Tailwind classes don't help.
+  // Use the theme token directly — it switches automatically on .dark.
+  const labelColor = "var(--color-muted-foreground)";
   const chartH = (n: number) => Math.max(160, n * 50 + 50);
 
   const memLegend = [
