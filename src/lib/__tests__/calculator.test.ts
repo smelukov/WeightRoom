@@ -894,16 +894,19 @@ describe("normalizeScores", () => {
 // ─── getValueColor ────────────────────────────────────────────────────────────
 
 describe("getValueColor", () => {
+  // Saturation 65% / lightness 45% are intentionally muted so the gradient
+  // stays legible on a white background. If you bump these, also update the
+  // visual-design rationale in `src/index.css` and `AGENTS.md`.
   it("returns red (hue=0) for score 0", () => {
-    expect(getValueColor(0)).toBe("hsl(0, 85%, 50%)");
+    expect(getValueColor(0)).toBe("hsl(0, 65%, 45%)");
   });
 
   it("returns green (hue=120) for score 1", () => {
-    expect(getValueColor(1)).toBe("hsl(120, 85%, 50%)");
+    expect(getValueColor(1)).toBe("hsl(120, 65%, 45%)");
   });
 
   it("returns yellow (hue=60) for score 0.5", () => {
-    expect(getValueColor(0.5)).toBe("hsl(60, 85%, 50%)");
+    expect(getValueColor(0.5)).toBe("hsl(60, 65%, 45%)");
   });
 });
 
@@ -923,28 +926,28 @@ describe("getTpsLabel", () => {
   });
 
   it("labels < 1 TPS as 'Very slow'", () => {
-    expect(getTpsLabel(0.1)).toEqual({ label: "Very slow", color: "text-red-400" });
-    expect(getTpsLabel(0.99)).toEqual({ label: "Very slow", color: "text-red-400" });
+    expect(getTpsLabel(0.1)).toEqual({ label: "Very slow", color: "text-danger" });
+    expect(getTpsLabel(0.99)).toEqual({ label: "Very slow", color: "text-danger" });
   });
 
   it("labels 1–4 TPS as 'Slow'", () => {
-    expect(getTpsLabel(1)).toEqual({ label: "Slow", color: "text-amber-400" });
-    expect(getTpsLabel(4.9)).toEqual({ label: "Slow", color: "text-amber-400" });
+    expect(getTpsLabel(1)).toEqual({ label: "Slow", color: "text-warning" });
+    expect(getTpsLabel(4.9)).toEqual({ label: "Slow", color: "text-warning" });
   });
 
   it("labels 5–14 TPS as 'Moderate'", () => {
-    expect(getTpsLabel(5)).toEqual({ label: "Moderate", color: "text-orange-300" });
-    expect(getTpsLabel(14.9)).toEqual({ label: "Moderate", color: "text-orange-300" });
+    expect(getTpsLabel(5)).toEqual({ label: "Moderate", color: "text-warning" });
+    expect(getTpsLabel(14.9)).toEqual({ label: "Moderate", color: "text-warning" });
   });
 
   it("labels 15–29 TPS as 'Good'", () => {
-    expect(getTpsLabel(15)).toEqual({ label: "Good", color: "text-emerald-400" });
-    expect(getTpsLabel(29.9)).toEqual({ label: "Good", color: "text-emerald-400" });
+    expect(getTpsLabel(15)).toEqual({ label: "Good", color: "text-success" });
+    expect(getTpsLabel(29.9)).toEqual({ label: "Good", color: "text-success" });
   });
 
   it("labels ≥ 30 TPS as 'Fast'", () => {
-    expect(getTpsLabel(30)).toEqual({ label: "Fast", color: "text-emerald-300" });
-    expect(getTpsLabel(1000)).toEqual({ label: "Fast", color: "text-emerald-300" });
+    expect(getTpsLabel(30)).toEqual({ label: "Fast", color: "text-success" });
+    expect(getTpsLabel(1000)).toEqual({ label: "Fast", color: "text-success" });
   });
 });
 

@@ -77,8 +77,8 @@ export function CustomModelForm({
   return (
     <div className="space-y-3">
       {/* HF Import */}
-      <div className="p-3 rounded-lg bg-indigo-950/30 border border-indigo-800/30 space-y-2">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-indigo-400 uppercase tracking-wider">
+      <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <SiHuggingface className="w-3.5 h-3.5" aria-hidden="true" />
           Import from HuggingFace
           <InfoTooltip content="Paste a HuggingFace model URL to auto-fill architecture parameters from config.json. Use the original model repo, not GGUF/quantized forks." />
@@ -103,17 +103,17 @@ export function CustomModelForm({
             {loading ? "..." : "Fetch"}
           </Button>
         </div>
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <p className="text-xs text-danger-foreground">{error}</p>}
         {importedModelId && !error && (
           <div className="space-y-1.5">
-            <p className="text-xs text-emerald-400">
+            <p className="text-xs text-success-foreground">
               Imported: <span className="font-medium">{importedModelId}</span>
             </p>
             <CapabilityBadges caps={capabilities} showLabels />
           </div>
         )}
         {warning && !error && (
-          <p className="text-xs text-amber-400">{warning}</p>
+          <p className="text-xs text-warning-foreground">{warning}</p>
         )}
       </div>
 

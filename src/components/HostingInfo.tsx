@@ -15,8 +15,8 @@ export function HostingInfo({ value, onChange }: HostingInfoProps) {
   };
 
   return (
-    <div className="space-y-2 p-3 rounded-lg bg-sky-950/30 border border-sky-800/30">
-      <div className="flex items-center gap-1.5 text-xs font-medium text-sky-400 uppercase tracking-wider">
+    <div className="space-y-2 p-3 rounded-lg bg-muted/60 border border-border">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
         <LuCloud className="w-3.5 h-3.5" aria-hidden="true" />
         Hosting Info
         <InfoTooltip content="Optional fields to compare cloud hosting options side by side." />

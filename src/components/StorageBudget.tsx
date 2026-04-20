@@ -16,26 +16,26 @@ interface StorageBudgetProps {
 const statusConfig = {
   fits: {
     label: "Fits comfortably",
-    color: "text-emerald-400",
-    bg: "bg-emerald-400/10 border-emerald-400/20",
-    bar: "bg-emerald-500",
+    color: "text-success-foreground",
+    bg: "bg-success-soft border-success/30",
+    bar: "bg-success",
     icon: "✓",
   },
   tight: {
     label: "Tight fit",
-    color: "text-amber-400",
-    bg: "bg-amber-400/10 border-amber-400/20",
-    bar: "bg-amber-500",
+    color: "text-warning-foreground",
+    bg: "bg-warning-soft border-warning/30",
+    bar: "bg-warning",
     icon: "⚠",
   },
   exceeds: {
     label: "Not enough space",
-    color: "text-red-400",
-    bg: "bg-red-400/10 border-red-400/20",
-    bar: "bg-red-500",
+    color: "text-danger-foreground",
+    bg: "bg-danger-soft border-danger/30",
+    bar: "bg-danger",
     icon: "✗",
   },
-};
+} as const;
 
 export function StorageBudget({
   disk,

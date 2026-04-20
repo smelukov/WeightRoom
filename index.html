@@ -1,11 +1,35 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>WeightRoom — LLM Hardware Calculator</title>
     <meta name="description" content="Estimate RAM, storage, and throughput for running LLMs locally or in the cloud" />
+    <!--
+      Anti-flash theme bootstrap. Runs before the React bundle so that the page
+      paints immediately in the correct theme rather than flashing the default
+      and then re-rendering. Reads the same `localStorage["theme"]` key that
+      next-themes (configured in src/components/ThemeProvider.tsx) writes to,
+      so the two stay in sync. `try/catch` covers Safari private mode where
+      localStorage access throws.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme') || 'system';
+          var resolved =
+            stored === 'system'
+              ? window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+              : stored;
+          document.documentElement.classList.add(resolved);
+          document.documentElement.style.colorScheme = resolved;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

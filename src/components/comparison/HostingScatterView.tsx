@@ -199,7 +199,7 @@ const ScatterTooltip = memo(function ScatterTooltip({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{d.ramLabel ?? "RAM"}</span>
                 <span className={`font-semibold ${
-                  d.ramStatus === "fits" ? "text-emerald-400" : d.ramStatus === "tight" ? "text-amber-400" : "text-red-400"
+                  d.ramStatus === "fits" ? "text-success" : d.ramStatus === "tight" ? "text-warning" : "text-danger"
                 }`}>
                   {d.ramStatus === "fits" ? "✓ Fits" : d.ramStatus === "tight" ? "⚠ Tight" : "✗ Exceeds"}
                 </span>
@@ -209,7 +209,7 @@ const ScatterTooltip = memo(function ScatterTooltip({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Storage</span>
                 <span className={`font-semibold ${
-                  d.diskStatus === "fits" ? "text-emerald-400" : d.diskStatus === "tight" ? "text-amber-400" : "text-red-400"
+                  d.diskStatus === "fits" ? "text-success" : d.diskStatus === "tight" ? "text-warning" : "text-danger"
                 }`}>
                   {d.diskStatus === "fits" ? "✓ Fits" : d.diskStatus === "tight" ? "⚠ Tight" : "✗ Exceeds"}
                 </span>
@@ -402,13 +402,13 @@ export const HostingScatterView = memo(function HostingScatterView({
       </ChartContainer>
       <div className="flex items-center gap-4 text-xs text-muted-foreground justify-center">
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full bg-green-500 inline-block" /> Best value
+          <span className="w-3 h-3 rounded-full bg-success inline-block" /> Best value
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full bg-yellow-500 inline-block" /> Moderate
+          <span className="w-3 h-3 rounded-full bg-warning inline-block" /> Moderate
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-full bg-red-500 inline-block" /> Expensive
+          <span className="w-3 h-3 rounded-full bg-danger inline-block" /> Expensive
         </span>
       </div>
     </div>

@@ -34,15 +34,21 @@ export function getTpsSystem(c: CardData): number | null {
   return result?.tpsSystem ?? null;
 }
 
-/** Colors consistent with ResultCard breakdown. */
+/**
+ * Theme-aware colours for the comparison charts. Recharts requires a CSS
+ * value (string), not a Tailwind classname, so we point each role at the
+ * same `--color-chart-N` / status tokens that `ResultCard` uses for its
+ * stacked bars. Both light and dark themes provide values for every var,
+ * so swapping the theme automatically re-tints the charts.
+ */
 export const MC = {
-  weights:   "#3b82f6", // blue-500
-  kvCache:   "#a855f7", // purple-500
-  osRam:     "#64748b", // slate-500
-  modelFile: "#14b8a6", // teal-500
-  diskOs:    "#475569", // slate-600
-  tpsUser:   "#f59e0b", // amber-500
-  tpsSys:    "#22c55e", // green-500
+  weights:   "var(--color-chart-1)",
+  kvCache:   "var(--color-chart-2)",
+  osRam:     "var(--color-chart-3)",
+  modelFile: "var(--color-chart-4)",
+  diskOs:    "var(--color-chart-3)",
+  tpsUser:   "var(--color-warning)",
+  tpsSys:    "var(--color-success)",
 } as const;
 
 export const emptyChartConfig = {} satisfies ChartConfig;

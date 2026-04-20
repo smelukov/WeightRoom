@@ -103,9 +103,12 @@ test.describe("HuggingFace model import", () => {
 
     await importHfUrl(page, MOCK_HF_URL);
 
-    // The error paragraph has class text-red-400 and contains the specific 404 message
+    // Don't pin to a CSS class — they go through theme tokens now.
+    // Use the actual error copy from src/lib/hf.ts so the test really
+    // verifies that the 404 path runs (not just that a tooltip mentions
+    // config.json somewhere on the page).
     await expect(
-      page.locator(".text-red-400").filter({ hasText: /config\.json/i }),
+      page.getByText(/config\.json not found/i),
     ).toBeVisible();
   });
 

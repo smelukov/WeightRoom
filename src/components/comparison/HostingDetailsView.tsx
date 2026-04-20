@@ -153,10 +153,10 @@ export const HostingDetailsView = memo(function HostingDetailsView({
                     <span
                       className={`ml-1 font-medium ${
                         ramStatus === "fits"
-                          ? "text-emerald-400"
+                          ? "text-success"
                           : ramStatus === "tight"
-                            ? "text-amber-400"
-                            : "text-red-400"
+                            ? "text-warning"
+                            : "text-danger"
                       }`}
                     >
                       {ramStatus === "fits" ? "✓" : ramStatus === "tight" ? "⚠" : "✗"}
@@ -169,10 +169,10 @@ export const HostingDetailsView = memo(function HostingDetailsView({
                     <span
                       className={`ml-1 font-medium ${
                         diskStatus === "fits"
-                          ? "text-emerald-400"
+                          ? "text-success"
                           : diskStatus === "tight"
-                            ? "text-amber-400"
-                            : "text-red-400"
+                            ? "text-warning"
+                            : "text-danger"
                       }`}
                     >
                       {diskStatus === "fits" ? "✓" : diskStatus === "tight" ? "⚠" : "✗"}
@@ -192,7 +192,7 @@ export const HostingDetailsView = memo(function HostingDetailsView({
                   </span>
                 )}
                 {concurrentUsers > 1 && (
-                  <span className="text-muted-foreground/70">
+                  <span className="text-muted-foreground">
                     👥 {concurrentUsers} users{kvCacheFillPct < 100 ? ` · ${kvCacheFillPct}% fill` : ""}
                   </span>
                 )}

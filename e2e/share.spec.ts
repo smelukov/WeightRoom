@@ -97,11 +97,18 @@ test.describe("URL state sharing", () => {
 
     await page.context().grantPermissions(["clipboard-write", "clipboard-read"]);
 
-    const shareBtn = page.getByTitle(/copy link to share/i);
+    // Header buttons are icon-only with aria-labels (visible "Share" text was
+    // removed when we moved to a tooltip-driven toolbar). Find by accessible
+    // name; the label flips to "Copied!" on success.
+    const shareBtn = page.getByRole("button", { name: /copy share link/i });
     await shareBtn.click();
 
-    // Button text briefly changes to "Copied!"
-    await expect(shareBtn).toContainText(/Copied!/i);
+    // The accessible name briefly changes to "Copied!" (driven by a 2-second
+    // state flip). Wait for that flip rather than asserting on inner text —
+    // the icon swap (Share → Check) makes textContent unreliable.
+    await expect(
+      page.getByRole("button", { name: /copied!/i }),
+    ).toBeVisible();
 
     const clipboardText = await page.evaluate(() =>
       navigator.clipboard.readText(),
