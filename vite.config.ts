@@ -17,4 +17,16 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      // Multi-page build. `embed.html` is a separate entry for the read-only
+      // iframe widget, served at `${base}embed.html`. Vite extracts shared
+      // chunks (React, lib code) automatically, so the embed payload stays
+      // small without us having to wire up manualChunks.
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        embed: path.resolve(__dirname, 'embed.html'),
+      },
+    },
+  },
 })

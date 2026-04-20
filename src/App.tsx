@@ -167,6 +167,7 @@ export default function App() {
           onClear={clearConfigs}
           onScreenshot={mode === "compare" ? handleCompareScreenshot : undefined}
           screenshotCapturing={compareCapturing}
+          configs={configs}
         />
 
         <main className="flex-1 px-4 pb-8 max-w-7xl mx-auto w-full">
