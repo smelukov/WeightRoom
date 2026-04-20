@@ -114,7 +114,7 @@ export const ConfigCard = memo(function ConfigCard({
   }
 
   return (
-    <Card ref={cardRef} className="relative overflow-visible">
+    <Card ref={cardRef} className="relative overflow-hidden">
       <div className="absolute top-2 right-2 flex items-center gap-0.5">
         <DropdownMenu>
           <Tooltip>

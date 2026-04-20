@@ -177,7 +177,11 @@ export default function App() {
             // narrow explicitly so the type system is happy and we don't crash
             // if the invariant is ever broken upstream.
             configs[0] ? (
-              <div className="max-w-xl mx-auto">
+              // Width tuned to fit the Available Hardware section without the
+              // 4-column GPU row collapsing labels onto two lines. Was max-w-xl
+              // (576px), which forced "VRAM (GB)" / "BW (GB/s)" to wrap and
+              // pushed the inputs out of alignment.
+              <div className="max-w-2xl mx-auto">
                 <ConfigCard
                   config={configs[0]}
                   onChange={(c) => updateConfig(0, c)}
