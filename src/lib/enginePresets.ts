@@ -53,6 +53,33 @@ export const ENGINE_PRESETS: readonly EnginePreset[] = [
 /** Sentinel value for the "manual KV %" mode in `ModelSettings.engineId`. */
 export const CUSTOM_ENGINE_ID = "custom";
 
+/**
+ * Pick a compatible engine when the user selects a quant whose family is
+ * incompatible with the currently-active engine.
+ *
+ * Returns null when the current `engineId` is already compatible (or
+ * undefined — legacy URLs without engineId fall through unchanged); in
+ * that case the caller should NOT touch engineId / kvCacheFillPct.
+ *
+ * Otherwise returns the first engine preset whose id appears in the
+ * quant family's compatibility set, paired with that preset's KV %. The
+ * caller (typically ConfigCard) can then atomically update both fields
+ * to keep the dropdown label and KV percentage in sync.
+ *
+ * Lives in this module (not quants.ts) because it depends on both
+ * QUANT_FAMILY_ENGINES (quants.ts) and ENGINE_PRESETS (here) — putting
+ * it here avoids creating an import cycle.
+ */
+export function pickCompatibleEngine(
+  quantFamilyEngines: ReadonlySet<string>,
+  currentEngineId: string | undefined,
+): { engineId: string; kvCacheFillPct: number } | null {
+  if (currentEngineId && quantFamilyEngines.has(currentEngineId)) return null;
+  const preset = ENGINE_PRESETS.find((p) => quantFamilyEngines.has(p.id));
+  if (!preset) return null;
+  return { engineId: preset.id, kvCacheFillPct: preset.pct };
+}
+
 function findPresetById(id: string): EnginePreset | null {
   return ENGINE_PRESETS.find((p) => p.id === id) ?? null;
 }

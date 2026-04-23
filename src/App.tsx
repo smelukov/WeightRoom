@@ -23,7 +23,7 @@ function createConfig(): CardData {
     id: crypto.randomUUID(),
     hfImportUrl: "",
     model: {
-      modelKey: "qwen3.5-27b",
+      modelKey: "qwen3.6-27b",
       customModel: {
         params: 7e9,
         layers: 32,

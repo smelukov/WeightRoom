@@ -46,7 +46,7 @@ vi.mock("html-to-image", () => ({
 
 const { ShareModal } = await import("../ShareModal");
 
-function makeCard(id: string, modelKey = "qwen3.5-27b"): CardData {
+function makeCard(id: string, modelKey = "qwen3.6-27b"): CardData {
   return {
     id,
     model: {

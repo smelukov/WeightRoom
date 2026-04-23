@@ -93,6 +93,24 @@ interface HfConfig {
   // Thinking / tool use detection (present when bundled into config.json)
   tokenizer_config?: { chat_template?: string };
   processor_config?: { chat_template?: string };
+  /**
+   * Quantization metadata, present when the model is a Hugging Face
+   * Transformers checkpoint that has been post-training-quantized via
+   * AutoGPTQ / AutoAWQ / Optimum / bitsandbytes etc. Most fields are
+   * library-specific, but `quant_method` and `bits` are stable across
+   * AutoGPTQ and AutoAWQ.
+   */
+  quantization_config?: {
+    /**
+     * Lowercase identifier set by the quantizer:
+     *   "gptq" | "awq" | "bitsandbytes" | "fp8" | "compressed-tensors" | …
+     * We only branch on a small whitelist — unknown values fall through
+     * to the dtype-based detection.
+     */
+    quant_method?: string;
+    bits?: number;
+    group_size?: number;
+  };
 }
 
 export function parseHfUrl(url: string): string | null {
@@ -159,13 +177,64 @@ function detectFormula(cfg: HfConfig): KvFormula {
 }
 
 /**
+ * Highest-confidence detection: read the explicit `quantization_config`
+ * block produced by AutoGPTQ / AutoAWQ. When present, this is more
+ * accurate than dtype inspection (which can't tell AWQ from GPTQ — both
+ * store INT4 packed inside U32 / I32 tensors).
+ *
+ * Returns null when no quant_method / bits combination matches a quant we
+ * actually support — the caller then falls back to dtype detection.
+ */
+function detectPrecisionFromQuantConfig(cfg: HfConfig): QuantName | null {
+  const qc = cfg.quantization_config;
+  if (!qc?.quant_method) return null;
+  const method = qc.quant_method.toLowerCase();
+  const bits = qc.bits;
+
+  if (method === "gptq") {
+    if (bits === 8) return "gptq_8bit";
+    if (bits === 4) return "gptq_4bit";
+    if (bits === 3) return "gptq_3bit";
+    return null;
+  }
+  if (method === "awq") {
+    // AutoAWQ only ships 4-bit kernels in production.
+    if (bits === 4 || bits == null) return "awq_4bit";
+    return null;
+  }
+  // Other libraries (bitsandbytes, compressed-tensors, fp8) — defer to
+  // dtype detection rather than guessing — they cover wildly different
+  // formats with overlapping bit-counts.
+  return null;
+}
+
+/**
+ * Determines whether the given HF API metadata indicates an MLX-format
+ * checkpoint. Two equally reliable signals:
+ *   • the "mlx" tag set by mlx_lm.convert when it pushes to the Hub,
+ *   • the "mlx-community/" org prefix in the repo id.
+ * We accept either to handle community forks that forget the tag.
+ */
+function isMlxRepo(repoId: string, tags: string[]): boolean {
+  if (tags.includes("mlx")) return true;
+  return repoId.toLowerCase().startsWith("mlx-community/");
+}
+
+/**
  * Detects quantization from safetensors dtype data — NOT from the repo name.
  *
  * Only overrides the selector for models that are ALREADY quantized (INT4, INT8, FP8, U32).
  * Native float precisions (BF16, F16, F32) return null so the user's current planning
  * quantization (e.g. q4_k_m) is preserved — the user decides how they'll deploy it.
+ *
+ * `mlxRepo` lets us route INT4 / INT8 to the proper MLX-family quants when
+ * the repo is clearly an MLX checkpoint — generic GGUF/GPTQ projection of
+ * "INT4 ≈ 4 bpw" under-counts MLX's per-group FP16 scale + bias overhead.
  */
-function detectPrecisionFromDtype(parameters?: Record<string, number>): QuantName | null {
+function detectPrecisionFromDtype(
+  parameters: Record<string, number> | undefined,
+  mlxRepo: boolean,
+): QuantName | null {
   if (!parameters) return null;
   // Find the dominant dtype by parameter count
   const dominant = Object.entries(parameters)
@@ -178,8 +247,11 @@ function detectPrecisionFromDtype(parameters?: Record<string, number>): QuantNam
   // FP8 — a quantization format (e.g. DeepSeek V3)
   if (dominant.startsWith("F8") || dominant.startsWith("FP8")) return "q8_0";
   // Integer quantization — AWQ, GPTQ, MLX 4-bit, etc.
-  if (dominant === "I4" || dominant === "INT4") return "q4";
-  if (dominant === "I8" || dominant === "INT8") return "q8_0";
+  // Without quantization_config we can't distinguish AWQ from GPTQ from
+  // generic INT4, so we route MLX repos to mlx_4bit (proper +0.5 bpw
+  // overhead) and fall back to plain "q4" for everything else.
+  if (dominant === "I4" || dominant === "INT4") return mlxRepo ? "mlx_4bit" : "q4";
+  if (dominant === "I8" || dominant === "INT8") return mlxRepo ? "mlx_8bit" : "q8_0";
   // BF16 — native precision on modern GPUs (A100+, H100)
   if (dominant === "BF16") return "bf16";
   // F16 / F32 — unquantized model; user sets their own deployment quantization
@@ -282,7 +354,7 @@ export async function fetchHfConfig(repoId: string): Promise<HfImportResult> {
     throw new Error("This model is gated — access requires authorization.");
   if (configRes.status === 404)
     throw new Error(
-      "config.json not found. The model may use a non-standard format (GGUF, RWKV .pth, etc.). Try the original HuggingFace Transformers repo.",
+      "config.json not found. The model may be a llama.cpp GGUF / RWKV .pth checkpoint that doesn't ship Hugging Face Transformers config. Try the original Transformers repo (or the AutoAWQ / AutoGPTQ / MLX fork that does include config.json).",
     );
   if (!configRes.ok) throw new Error(`Failed to fetch config: HTTP ${configRes.status}`);
 
@@ -355,8 +427,14 @@ export async function fetchHfConfig(repoId: string): Promise<HfImportResult> {
       : baseMaxPos;
   const maxContextK = Math.round(effectiveMaxPos / 1024);
 
-  // Detect actual model precision from tensor dtype (not from repo name)
-  const detectedPrecision = detectPrecisionFromDtype(apiData?.safetensors?.parameters);
+  // Detect actual model precision. quantization_config (when present) is
+  // the only way to distinguish AWQ from GPTQ — both pack INT4 weights
+  // into the same I32/U32 tensor dtype, so dtype alone is ambiguous.
+  // Order: explicit metadata > dtype heuristics > null (user picks).
+  const mlxRepo = isMlxRepo(repoId, tags);
+  const detectedPrecision =
+    detectPrecisionFromQuantConfig(cfg) ??
+    detectPrecisionFromDtype(apiData?.safetensors?.parameters, mlxRepo);
 
   // For MLX 1-bit (U32-packed), safetensors.total counts packed U32 *elements*, not original weights
   // (each U32 holds 32 sign bits). The reported count is ~40x lower than actual — fall back to name parsing.

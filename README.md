@@ -19,8 +19,14 @@ A web calculator that estimates RAM, storage, and token throughput (TPS) for run
 - **Screenshots** — export single card or full comparison as PNG (2× retina)
 - **URL sharing** — full state (model, quant, context, hosting) serialized to `?s=` URL parameter (backward-compatibility guarded by golden-URL tests)
 - **Share & Embed** — one-click dialog to generate social-ready PNGs (OG 1200×630, Square, Story), README badges (shields.io-style SVG + mini-card), and live `<iframe>` embed snippets. See [Embed & Share](#embed--share)
-- **Quantization support** — Q1 / Q2 / Q3 / Q4 / Q5 / Q6 / Q8 / FP16 / BF16 / FP32 for both weights and KV cache
-- **Concurrent users + inference engine** — KV cache scales by parallel slots and engine pre-allocation strategy (llama.cpp / Ollama / MLX = 100% reservation; vLLM / SGLang / TGI PagedAttention ≈ 25%; TensorRT-LLM ≈ 30%; or a custom %)
+- **Quantization support** — five families covered:
+  - **Float**: FP32 / BF16 / FP16
+  - **GGUF** (llama.cpp / Ollama): Q8_0, Q6_K, Q5_K_M, Q4_K_M, Q3_K_M, Q2_K, Q1_0
+  - **MLX** (Apple Silicon, g64): MLX 8-bit / 4-bit / 3-bit / 2-bit
+  - **GPTQ** (vLLM / ExLlama, g128): 8-bit / 4-bit / 3-bit
+  - **AWQ** (vLLM / AutoAWQ, g128): 4-bit
+  - KV cache quants: BF16, FP16, Q8_0, Q4
+- **Concurrent users + inference engine** — KV cache scales by parallel slots and engine pre-allocation strategy (llama.cpp / Ollama / MLX = 100% reservation; vLLM / SGLang / TGI PagedAttention ≈ 25%; TensorRT-LLM ≈ 30%; or a custom %). The engine dropdown is filtered by the selected quant family — picking AWQ/GPTQ hides CPU runtimes, picking GGUF/MLX hides PagedAttention engines (use `Custom KV %` as an escape hatch).
 - **Light / Dark / System theme** — `next-themes` switcher in the header, with an inline anti-flash bootstrap so the page never paints in the wrong theme. All component colours go through semantic design tokens (`success`, `warning`, `info`, `cat-vision`, …) defined in `src/index.css`, so adding a new colour automatically works in both themes
 
 ## KV Cache Formulas
@@ -158,9 +164,9 @@ src/
     calculator.ts          # pure math: calcLLMRam, calcDisk, calcValueScore
     scoring.ts             # UI scoring utils: normalizeScores, getValueColor, getTpsLabel
     models.ts              # static model catalog (KNOWN_MODELS, getModelGroups)
-    quants.ts              # quantization constants: QUANT_BITS, WEIGHT_QUANTS, KV_QUANTS
+    quants.ts              # QUANT_SPECS source-of-truth + QUANT_BITS, QUANT_FAMILY_ENGINES, getQuantFamily, getWeightQuantGroups
     calcInput.ts           # resolveModel + input assembly for calc hooks
-    enginePresets.ts       # inference-engine presets + resolveActiveEngine (single source of truth)
+    enginePresets.ts       # inference-engine presets + resolveActiveEngine + pickCompatibleEngine (auto-snap)
     hf.ts                  # HuggingFace config.json fetching + formula + activeParams detection
     state.ts               # URL state serialization: encodeState / decodeState / encodeStateForEmbed
     screenshot.tsx         # PNG/SVG export via html-to-image (incl. renderShareCardToBlob/DataUrl/Svg)

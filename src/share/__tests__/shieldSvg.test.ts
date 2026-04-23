@@ -13,7 +13,7 @@ function makeCard(overrides: Partial<CardData["model"]> = {}): CardData {
   return {
     id: "test-card",
     model: {
-      modelKey: "qwen3.5-27b",
+      modelKey: "qwen3.6-27b",
       customModel: {
         params: 7e9,
         layers: 32,
@@ -67,9 +67,9 @@ describe("renderShieldSvg", () => {
   it("includes the default 'WeightRoom' label and renders a TPS / RAM summary", () => {
     const svg = renderShieldSvg(makeCard());
     expect(svg).toContain(">WeightRoom<");
-    // Catalog name "Qwen3-Coder 30B-A3B" is what KNOWN_MODELS["qwen3.5-27b"]
-    // resolves to today; if the catalog renames, this assertion will catch it
-    // before we ship a badge with a stale name.
+    // KNOWN_MODELS["qwen3.6-27b"] resolves to displayName "Qwen 3.6 27B"
+    // today; if the catalog renames, this assertion will catch it before we
+    // ship a badge with a stale name.
     expect(svg).toMatch(/Qwen|qwen/i);
     // Either "GB" or "t/s" should appear — those are the metric units.
     expect(svg).toMatch(/GB|t\/s/);

@@ -24,7 +24,7 @@ test.describe("URL state sharing", () => {
     await page.goto("/");
     await page.waitForSelector(".text-4xl");
 
-    // Change to a distinct model (Llama 3.1 8B ≠ default Qwen 3.5 27B)
+    // Change to a distinct model (Llama 3.1 8B ≠ default Qwen 3.6 27B)
     await modelTrigger(page).click();
     const searchInput = page.getByPlaceholder(/search or paste hf link/i);
     await searchInput.waitFor({ state: "visible" });
@@ -128,6 +128,6 @@ test.describe("URL state sharing", () => {
     // Must show the default model, not crash
     await expect(
       page.locator('[data-slot="combobox-trigger"]').first(),
-    ).toContainText(/Qwen 3\.5 27B/i);
+    ).toContainText(/Qwen 3\.6 27B/i);
   });
 });

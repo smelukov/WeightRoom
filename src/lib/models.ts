@@ -21,7 +21,7 @@ export const KNOWN_MODELS: Record<string, KnownModel> = {
     hfRepoId: "google/gemma-2-9b",
     params: 9e9,
     layers: 42,
-    kvHeads: 4,
+    kvHeads: 8,
     headDim: 256,
     kvFormula: "hybrid",
     fullLayers: 21,
@@ -50,7 +50,7 @@ export const KNOWN_MODELS: Record<string, KnownModel> = {
     hfRepoId: "google/gemma-3-12b-it",
     params: 12e9,
     layers: 48,
-    kvHeads: 4,
+    kvHeads: 8,
     headDim: 256,
     kvFormula: "hybrid",
     fullLayers: 8,
@@ -185,10 +185,17 @@ export const KNOWN_MODELS: Record<string, KnownModel> = {
     maxContextK: 256,
     capabilities: { vlm: true, thinking: true, toolUse: true },
   },
-  "qwen3.5-27b": {
-    displayName: "Qwen 3.5 27B",
+  // ── Qwen 3.6 (Apr 2026 — Gated DeltaNet hybrid + agentic coding) ──
+  // Both variants use the qwen3_5 / qwen3_5_moe model types and share the
+  // hybrid attention pattern: every 4th layer is full attention
+  // (full_attention_interval=4), the rest are Gated DeltaNet linear attention.
+  // Architecture parameters verified against config.json on Hugging Face.
+  "qwen3.6-27b": {
+    // Dense, qwen3_5: 64 layers → 16 full + 48 linear. num_key_value_heads=4,
+    // head_dim=256. vision_config + image_token_id → VLM.
+    displayName: "Qwen 3.6 27B",
     brand: "Alibaba",
-    hfRepoId: "Qwen/Qwen3.5-27B",
+    hfRepoId: "Qwen/Qwen3.6-27B",
     params: 27e9,
     layers: 64,
     kvHeads: 4,
@@ -199,10 +206,13 @@ export const KNOWN_MODELS: Record<string, KnownModel> = {
     maxContextK: 256,
     capabilities: { vlm: true, thinking: true, toolUse: true },
   },
-  "qwen3.5-35b-a3b": {
-    displayName: "Qwen 3.5 35B-A3B (MoE)",
+  "qwen3.6-35b-a3b": {
+    // MoE, qwen3_5_moe: 40 layers → 10 full + 30 linear. num_key_value_heads=2,
+    // head_dim=256. 256 experts, 8 routed + 1 shared per token (≈ 3B active).
+    // vision_config present → VLM.
+    displayName: "Qwen 3.6 35B-A3B (MoE)",
     brand: "Alibaba",
-    hfRepoId: "Qwen/Qwen3.5-35B-A3B",
+    hfRepoId: "Qwen/Qwen3.6-35B-A3B",
     params: 35e9,
     layers: 40,
     kvHeads: 2,
@@ -377,7 +387,7 @@ export const KNOWN_MODELS: Record<string, KnownModel> = {
     hfRepoId: "microsoft/Phi-3.5-mini-instruct",
     params: 3.8e9,
     layers: 32,
-    kvHeads: 8,
+    kvHeads: 32,
     headDim: 96,
     moe: false,
     maxContextK: 128,
@@ -414,7 +424,7 @@ export const KNOWN_MODELS: Record<string, KnownModel> = {
     hfRepoId: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
     params: 14.77e9,
     layers: 48,
-    kvHeads: 4,
+    kvHeads: 8,
     headDim: 128,
     moe: false,
     maxContextK: 128,

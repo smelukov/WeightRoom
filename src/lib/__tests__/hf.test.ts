@@ -301,6 +301,139 @@ describe("fetchHfConfig", () => {
     expect(result.detectedPrecision).toBeNull();
   });
 
+  // ── quantization_config detection (highest-priority signal) ──────────────
+  // AutoGPTQ / AutoAWQ ship a `quantization_config` block in config.json
+  // that specifies quant_method + bits. This is more reliable than dtype
+  // because both libraries pack INT4 weights into the same I32 tensors.
+
+  it("detects awq_4bit from quantization_config.quant_method=awq", async () => {
+    setupFetch(
+      makeConfigJson({
+        quantization_config: { quant_method: "awq", bits: 4, group_size: 128 },
+      }),
+      {},
+      makeApiResponse({
+        // Crucially the dtype reads as INT32 (packed), NOT INT4. Without
+        // quantization_config we'd fall through to the F16/BF16 branch and
+        // return null — losing the auto-detect entirely.
+        safetensors: { total: 7e9, parameters: { I32: 7e9 } },
+      }),
+    );
+    const result = await fetchHfConfig("TheBloke/Mistral-7B-AWQ");
+    expect(result.detectedPrecision).toBe("awq_4bit");
+  });
+
+  it("detects gptq_4bit from quantization_config.quant_method=gptq, bits=4", async () => {
+    setupFetch(
+      makeConfigJson({
+        quantization_config: { quant_method: "gptq", bits: 4, group_size: 128 },
+      }),
+      {},
+      makeApiResponse({
+        safetensors: { total: 7e9, parameters: { I32: 7e9 } },
+      }),
+    );
+    const result = await fetchHfConfig("TheBloke/Llama-2-7B-GPTQ");
+    expect(result.detectedPrecision).toBe("gptq_4bit");
+  });
+
+  it("detects gptq_8bit and gptq_3bit by bit-count", async () => {
+    setupFetch(
+      makeConfigJson({
+        quantization_config: { quant_method: "gptq", bits: 8 },
+      }),
+    );
+    expect(
+      (await fetchHfConfig("org/llama-gptq-8bit")).detectedPrecision,
+    ).toBe("gptq_8bit");
+
+    setupFetch(
+      makeConfigJson({
+        quantization_config: { quant_method: "gptq", bits: 3 },
+      }),
+    );
+    expect(
+      (await fetchHfConfig("org/llama-gptq-3bit")).detectedPrecision,
+    ).toBe("gptq_3bit");
+  });
+
+  it("quantization_config takes priority over safetensors dtype", async () => {
+    // Even if dtype suggests INT4 → "q4", the explicit quant_method wins
+    // and we route to the more accurate awq_4bit (4.25 bpw vs 4.0 bpw).
+    setupFetch(
+      makeConfigJson({
+        quantization_config: { quant_method: "awq", bits: 4 },
+      }),
+      {},
+      makeApiResponse({
+        safetensors: { total: 7e9, parameters: { INT4: 7e9 } },
+      }),
+    );
+    const result = await fetchHfConfig("org/awq-with-int4-dtype");
+    expect(result.detectedPrecision).toBe("awq_4bit");
+  });
+
+  it("falls through to dtype detection when quant_method is unknown", async () => {
+    // bitsandbytes / compressed-tensors / unknown libs → defer to dtype
+    setupFetch(
+      makeConfigJson({
+        quantization_config: { quant_method: "bitsandbytes", bits: 4 },
+      }),
+      {},
+      makeApiResponse({
+        safetensors: { total: 7e9, parameters: { INT4: 7e9 } },
+      }),
+    );
+    const result = await fetchHfConfig("org/bnb-quantized-model");
+    expect(result.detectedPrecision).toBe("q4");
+  });
+
+  // ── MLX detection (community fork heuristic) ─────────────────────────────
+  // MLX checkpoints don't ship quantization_config; we infer them from the
+  // org prefix (mlx-community/) or the explicit "mlx" tag.
+
+  it("detects mlx_4bit when repo prefix is mlx-community/ and dtype is INT4", async () => {
+    setupFetch(
+      makeConfigJson(),
+      {},
+      makeApiResponse({
+        modelId: "mlx-community/Qwen2.5-7B-Instruct-4bit",
+        tags: ["mlx", "transformers"],
+        safetensors: { total: 7e9, parameters: { INT4: 7e9 } },
+      }),
+    );
+    const result = await fetchHfConfig("mlx-community/Qwen2.5-7B-Instruct-4bit");
+    expect(result.detectedPrecision).toBe("mlx_4bit");
+  });
+
+  it("detects mlx_8bit when repo has 'mlx' tag and dtype is INT8", async () => {
+    setupFetch(
+      makeConfigJson(),
+      {},
+      makeApiResponse({
+        modelId: "user/some-mlx-fork",
+        tags: ["mlx"],
+        safetensors: { total: 7e9, parameters: { INT8: 7e9 } },
+      }),
+    );
+    const result = await fetchHfConfig("user/some-mlx-fork");
+    expect(result.detectedPrecision).toBe("mlx_8bit");
+  });
+
+  it("falls back to q4 (not mlx) when repo prefix is generic and 'mlx' tag is missing", async () => {
+    setupFetch(
+      makeConfigJson(),
+      {},
+      makeApiResponse({
+        modelId: "TheBloke/Llama-7B-INT4",
+        tags: ["transformers", "safetensors"],
+        safetensors: { total: 7e9, parameters: { INT4: 7e9 } },
+      }),
+    );
+    const result = await fetchHfConfig("TheBloke/Llama-7B-INT4");
+    expect(result.detectedPrecision).toBe("q4");
+  });
+
   // ── Capabilities detection ───────────────────────────────────────────────
 
   it("detects VLM capability from pipeline_tag 'image-text-to-text'", async () => {

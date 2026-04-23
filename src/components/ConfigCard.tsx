@@ -16,7 +16,14 @@ import {
   copyScreenshotToClipboard,
   buildCardFilename,
 } from "@/lib/screenshot";
-import type { CardData, ModelSettings, HostingData } from "@/lib/types";
+import { QUANT_FAMILY_ENGINES, getQuantFamily } from "@/lib/quants";
+import { pickCompatibleEngine } from "@/lib/enginePresets";
+import type {
+  CardData,
+  ModelSettings,
+  HostingData,
+  QuantName,
+} from "@/lib/types";
 import { memo, useRef, useState } from "react";
 import {
   LuCamera,
@@ -81,6 +88,24 @@ export const ConfigCard = memo(function ConfigCard({
     onChange({ ...config, model: { ...config.model, ...partial } });
   const updateHosting = (partial: Partial<HostingData>) =>
     onChange({ ...config, hosting: { ...config.hosting, ...partial } });
+
+  /**
+   * Picking a quant from a different family (e.g. switching GGUF→AWQ) can
+   * leave the user looking at an engine preset that no longer exists in the
+   * filtered dropdown. Auto-snap to the first compatible preset so the
+   * dropdown label and the actual KV % stay in sync — this also avoids a
+   * "ghost" engineId that the dropdown can't render.
+   *
+   * "custom" is intentionally compatible with every family (see
+   * QUANT_FAMILY_ENGINES), so the user's manual KV % is never overridden.
+   */
+  const onQuantChange = (quant: QuantName) => {
+    const fallback = pickCompatibleEngine(
+      QUANT_FAMILY_ENGINES[getQuantFamily(quant)],
+      config.model.engineId,
+    );
+    updateModel(fallback ? { quant, ...fallback } : { quant });
+  };
 
   async function handleScreenshot(action: "save" | "copy") {
     if (!cardRef.current || capturing) return;
@@ -256,7 +281,7 @@ export const ConfigCard = memo(function ConfigCard({
         <QuantSelector
           quant={config.model.quant}
           kvQuant={config.model.kvQuant}
-          onQuantChange={(quant) => updateModel({ quant })}
+          onQuantChange={onQuantChange}
           onKvQuantChange={(kvQuant) => updateModel({ kvQuant })}
         />
 
@@ -270,6 +295,7 @@ export const ConfigCard = memo(function ConfigCard({
           concurrentUsers={config.model.concurrentUsers ?? 1}
           kvCacheFillPct={config.model.kvCacheFillPct ?? 100}
           engineId={config.model.engineId}
+          quant={config.model.quant}
           onConcurrentUsersChange={(concurrentUsers) => updateModel({ concurrentUsers })}
           onKvCacheFillPctChange={(kvCacheFillPct) =>
             // Typing a custom value implies the user is in custom mode — keep
