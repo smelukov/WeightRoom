@@ -163,6 +163,51 @@ describe("decodeState — new quant families round-trip", () => {
   });
 });
 
+// ─── HostingData.hardwarePresetId round-trip ─────────────────────────────────
+// Same property as `quant`: the encoder treats hostings opaquely, so a new
+// optional field on HostingData should round-trip without any encoder change.
+// These tests guard against an accidental "stripped on encode" regression
+// (e.g. someone adding a whitelist-based serializer) and lock in the
+// "undefined => key absent" semantics required for backward-compat with
+// every URL shared before this field existed.
+
+describe("decodeState — HostingData.hardwarePresetId round-trip", () => {
+  const presetIds = [
+    "m1-max",
+    "m3-ultra",
+    "h100-sxm",
+    "h200",
+    "rtx-4090",
+    "mi300x",
+    "custom",
+  ] as const;
+
+  it.each(presetIds)("round-trips hardwarePresetId=%s losslessly", (id) => {
+    const card = {
+      ...minimalCard,
+      hosting: { ...minimalCard.hosting, hardwarePresetId: id },
+    };
+    const decoded = decodeState(
+      encodeState({ mode: "single", configs: [card] }),
+    );
+    expect(decoded?.configs[0]?.hosting.hardwarePresetId).toBe(id);
+  });
+
+  it("omits the key entirely when hardwarePresetId is undefined (URL-size guarantee)", () => {
+    // We don't want to bloat every URL with `"hardwarePresetId":null` for
+    // users who never touched the dropdown. JSON.stringify drops
+    // `undefined` values by default — this test pins that behaviour.
+    const encoded = encodeState({ mode: "single", configs: [minimalCard] });
+    // base64url decode → JSON.parse to inspect the raw payload
+    const padded = encoded
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(encoded.length / 4) * 4, "=");
+    const json = atob(padded);
+    expect(json).not.toContain("hardwarePresetId");
+  });
+});
+
 // ─── Golden URLs (backward compatibility) ────────────────────────────────────
 // The values below are committed verbatim and must decode forever. A
 // breakage here means every previously-shared link would 404 (or silently

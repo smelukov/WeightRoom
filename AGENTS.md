@@ -112,6 +112,17 @@ Tested in isolation (`ConcurrentUsersInput.test.tsx`).
 
 `engineId` is intentionally optional in `ModelSettings` for backward compatibility with shared URLs created before this field existed; the UI falls back to pct-based matching when it is `undefined`. Do not make it required.
 
+### `hardwarePresetId` ⇄ `HostingData` fields synchronisation
+
+Hardware presets (`src/lib/hardwarePresets.ts`) mirror the engine-preset architecture but live in `HostingData`, not `ModelSettings`:
+
+- `PRESET_OWNED_FIELDS` is the allow-list of `HostingData` keys a preset may write: `cpuModel`, `ramType`, `ramBandwidthGBs`, `availableRam`, `gpuCount`, `gpuVram`, `gpuBandwidth`, `gpuInfo`, `efficiency`. Every preset MUST write all of these explicitly (zero/empty for the branch it doesn't apply to) — the unit test enforces full coverage. Half-written presets leave stale Apple `cpuModel` next to a freshly-applied H100 in practice.
+- selecting a hardware preset → spread `preset.hosting` over current `HostingData` AND set `hardwarePresetId: preset.id` in one `setState` (`AvailableHardware.handlePresetSelect`). Apple presets zero the discrete-GPU block (`gpuCount/gpuVram/gpuBandwidth=0`, `gpuInfo=""`) and snap `efficiency="60"` (Unified). GPU presets clear the Apple unified-memory block (`cpuModel/ramType/ramBandwidthGBs/availableRam=""`) and snap `efficiency="80"` (GPU).
+- manually editing any field in `PRESET_OWNED_FIELDS` → stamp `hardwarePresetId: "custom"` so the dropdown switches to Custom (`AvailableHardware.update` does this automatically — keep that branch). This includes the BW efficiency preset buttons: clicking CPU/Unified/GPU after picking a card releases the preset.
+- editing fields outside that allow-list (`osOverheadGb`, `price`, `notes`, `availableStorage`, `cpuCores`, `cpuFreqGHz`, `storageType`) → DO NOT touch `hardwarePresetId`; those fields are truly orthogonal and survive every preset switch.
+
+`resolveActiveHardware` is the single source of truth for "which hardware preset is active" — same fail-loud semantics as `resolveActiveEngine`. Hardware and engine presets are orthogonal: picking an H100 must never touch `engineId`, and switching to vLLM must never touch `HostingData`. Numbers in the catalog come from official datasheets (Apple Support tech specs, NVIDIA `data-center/*`, AMD `instinct-tech-docs`); when adding a new preset cite the source in an inline comment so future updates can re-verify.
+
 ### TypeScript strictness
 
 `tsconfig.app.json` and `tsconfig.node.json` enable `strict`, `noImplicitOverride`, `noImplicitReturns`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes`. Do not relax these flags — fix the underlying code instead. In particular:
@@ -130,6 +141,7 @@ Tested in isolation (`ConcurrentUsersInput.test.tsx`).
 | `lib/quants.ts` | Quantization constants: QUANT_SPECS (source of truth), QUANT_BITS, WEIGHT_QUANTS, KV_QUANTS, QUANT_FAMILY_ENGINES, getQuantFamily, getWeightQuantGroups | No model data, no logic |
 | `lib/calcInput.ts` | `resolveModel` + assemble `CalcOptions` / `ValueScoreInput` from a `CardData` | No formulas, no fetch, no React |
 | `lib/enginePresets.ts` | Engine preset catalog + `resolveActiveEngine` + `pickCompatibleEngine` (auto-snap) | No React, no fetch (must remain pure to be shared by UI and Footer) |
+| `lib/hardwarePresets.ts` | Hardware preset catalog (Apple Silicon Max/Ultra, NVIDIA datacenter/consumer, AMD Instinct) + `resolveActiveHardware` + `PRESET_OWNED_FIELDS` allow-list | No React, no fetch (must remain pure — shared by `AvailableHardware` UI and Footer docs) |
 | `lib/hf.ts` | Fetch HF config, detect formula/precision/activeParams | No React state, no routing |
 | `lib/state.ts` | URL encode/decode only | No fetch, no React hooks |
 | `lib/screenshot.ts` | PNG export via html-to-image | No React state, no formulas |

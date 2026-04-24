@@ -6,6 +6,14 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { InfoTooltip } from "./InfoTooltip";
 import {
   getRamStatus,
@@ -15,6 +23,13 @@ import {
   type DiskResult,
 } from "@/lib/calculator";
 import type { HostingData } from "@/lib/types";
+import {
+  CUSTOM_HARDWARE_ID,
+  PRESET_OWNED_FIELDS,
+  getHardwarePresetGroups,
+  resolveActiveHardware,
+  type HardwarePreset,
+} from "@/lib/hardwarePresets";
 
 interface AvailableHardwareProps {
   totalRamGb: number;
@@ -37,6 +52,19 @@ const OS_PRESETS = [
   { label: "Linux", value: 2, title: "Linux server — ~2 GB for OS and system services on a lean installation." },
   { label: "macOS", value: 6, title: "macOS — ~6 GB typically consumed by WindowServer, Spotlight, system agents." },
 ];
+
+const PRESET_FIELD_SET: ReadonlySet<keyof HostingData> = new Set(
+  PRESET_OWNED_FIELDS,
+);
+
+const HARDWARE_PRESET_GROUPS = getHardwarePresetGroups();
+
+const HARDWARE_PRESET_TOOLTIP = `Pre-configured hardware presets fill the relevant fields with manufacturer-spec numbers (memory bandwidth, VRAM/RAM, GPU model). Bandwidth comes from official datasheets — Apple Support tech specs, NVIDIA data-center pages, AMD instinct-tech-docs (April 2026).
+
+• Apple Silicon presets fill the unified-memory branch (RAM bandwidth + size, GPU block zeroed) — pick these for Mac inference.
+• NVIDIA / AMD presets fill the discrete-GPU branch (count=1, VRAM, BW, model) — multiply the count manually for multi-GPU servers.
+
+Editing any preset-controlled field switches the dropdown to "Custom" — the underlying numbers are kept, only the label changes.`;
 
 const statusConfig = {
   fits: { label: "Fits", color: "text-success-foreground", bar: "bg-success", icon: "✓" },
@@ -142,6 +170,66 @@ function SpeedBlock({
   );
 }
 
+function HardwarePresetSelect({
+  activePreset,
+  onPresetSelect,
+  onCustomSelect,
+}: {
+  activePreset: HardwarePreset | null;
+  onPresetSelect: (preset: HardwarePreset) => void;
+  onCustomSelect: () => void;
+}) {
+  // The Select's `value` must always match a SelectItem; map "no preset" to
+  // the CUSTOM sentinel rather than echoing back the raw activePreset state.
+  const value = activePreset?.id ?? CUSTOM_HARDWARE_ID;
+  const triggerLabel = activePreset?.label ?? "Custom";
+
+  const handleChange = (id: string | null) => {
+    if (id === null) return;
+    if (id === CUSTOM_HARDWARE_ID) {
+      onCustomSelect();
+      return;
+    }
+    for (const group of HARDWARE_PRESET_GROUPS) {
+      const found = group.items.find((p) => p.id === id);
+      if (found) {
+        onPresetSelect(found);
+        return;
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-1 min-w-0">
+      <div className="flex items-center gap-1">
+        <Label className="text-xs">Hardware preset</Label>
+        <InfoTooltip content={HARDWARE_PRESET_TOOLTIP} />
+      </div>
+      <Select value={value} onValueChange={handleChange}>
+        <SelectTrigger
+          data-testid="hardware-preset-trigger"
+          className="h-7 text-xs w-full"
+        >
+          <span className="truncate">{triggerLabel}</span>
+        </SelectTrigger>
+        <SelectContent>
+          {HARDWARE_PRESET_GROUPS.map((group) => (
+            <SelectGroup key={group.category}>
+              <SelectLabel>{group.label}</SelectLabel>
+              {group.items.map((preset) => (
+                <SelectItem key={preset.id} value={preset.id}>
+                  {preset.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          ))}
+          <SelectItem value={CUSTOM_HARDWARE_ID}>Custom</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function Field({
   label,
   tooltip,
@@ -185,12 +273,45 @@ export function AvailableHardware({
   const availableStorage = hosting.availableStorage;
   const osOverheadGb = hosting.osOverheadGb;
 
-  const onAvailableRamChange = (val: string) => onHostingChange({ ...hosting, availableRam: val });
-  const onAvailableStorageChange = (val: string) => onHostingChange({ ...hosting, availableStorage: val });
-  const onOsOverheadGbChange = (val: number) => onHostingChange({ ...hosting, osOverheadGb: val });
+  // Manually editing any field a preset would have written makes the
+  // current preset "stale" — stamp `hardwarePresetId: "custom"` so the
+  // dropdown switches to Custom rather than silently keeping the
+  // original label. Mirrors the `engineId` ⇄ `kvCacheFillPct` discipline
+  // in `ConfigCard.onKvCacheFillPctChange`.
+  const update = (field: keyof HostingData, val: string) => {
+    const next: HostingData = { ...hosting, [field]: val };
+    if (PRESET_FIELD_SET.has(field)) next.hardwarePresetId = CUSTOM_HARDWARE_ID;
+    onHostingChange(next);
+  };
 
-  const update = (field: keyof HostingData, val: string) =>
-    onHostingChange({ ...hosting, [field]: val });
+  const onAvailableRamChange = (val: string) => update("availableRam", val);
+  const onAvailableStorageChange = (val: string) =>
+    onHostingChange({ ...hosting, availableStorage: val });
+  const onOsOverheadGbChange = (val: number) =>
+    onHostingChange({ ...hosting, osOverheadGb: val });
+
+  const activePreset = resolveActiveHardware(hosting, hosting.hardwarePresetId);
+
+  const handlePresetSelect = (preset: HardwarePreset) => {
+    onHostingChange({
+      ...hosting,
+      ...preset.hosting,
+      hardwarePresetId: preset.id,
+    });
+  };
+
+  const handleCustomSelect = () => {
+    if (hosting.hardwarePresetId === CUSTOM_HARDWARE_ID) return;
+    onHostingChange({ ...hosting, hardwarePresetId: CUSTOM_HARDWARE_ID });
+  };
+
+  const presetSelect = (
+    <HardwarePresetSelect
+      activePreset={activePreset}
+      onPresetSelect={handlePresetSelect}
+      onCustomSelect={handleCustomSelect}
+    />
+  );
 
   const gpuCount = parseInt(hosting.gpuCount) || 0;
   const gpuVram = parseFloat(hosting.gpuVram) || 0;
@@ -234,6 +355,7 @@ export function AvailableHardware({
     return (
       <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-border">
         {header}
+        {presetSelect}
         <div className="grid grid-cols-2 gap-3">
           {/* RAM + VRAM */}
           <div className="space-y-1.5">
@@ -362,6 +484,7 @@ export function AvailableHardware({
   return (
     <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-border">
       {header}
+      {presetSelect}
 
       {/* Provider + Price */}
       <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
