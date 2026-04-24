@@ -161,6 +161,22 @@ export interface HostingData {
   /** RAM reserved for the OS in GB. Default 2 (Linux server). */
   osOverheadGb: number;
   notes: string;
+  /**
+   * Identifier of the selected hardware preset (`"m5-max"`, `"h100-sxm"`,
+   * `"rtx-4090"`, …) or the literal `"custom"` for a manually-edited
+   * configuration.
+   *
+   * Optional for backward compatibility with shared URLs created before
+   * this field existed — `resolveActiveHardware` falls back to matching
+   * presets by their field values when `hardwarePresetId` is undefined.
+   *
+   * Mirrors the `engineId` ⇄ `kvCacheFillPct` pairing in `ModelSettings`:
+   * the id is the source of truth for the dropdown label, while the
+   * actual numeric fields drive the calculation. `resolveActiveHardware`
+   * detects de-sync (id matches a preset but a field disagrees) and
+   * returns Custom rather than silently lying with a stale label.
+   */
+  hardwarePresetId?: string | undefined;
 }
 
 /** Model selection and inference settings for a single card. */

@@ -189,6 +189,66 @@ export function Footer() {
                 </p>
               </div>
 
+              {/* Hardware presets */}
+              <div className="space-y-2">
+                <div className="text-[11px] font-medium text-foreground">
+                  Hardware presets (memory bandwidth, VRAM/RAM)
+                </div>
+                <p className="text-[10px] text-muted-foreground/70">
+                  The Hardware Preset dropdown in the Available Hardware
+                  block fills in the relevant fields with manufacturer-spec
+                  numbers from official datasheets, so you don't have to
+                  look them up. Switching between presets always
+                  normalises the full GPU + unified-memory + BW efficiency
+                  block — Apple presets snap efficiency to{" "}
+                  <span className="font-mono">Unified (60%)</span> and
+                  zero the discrete-GPU fields; discrete-GPU presets snap
+                  efficiency to <span className="font-mono">GPU (80%)</span>{" "}
+                  and clear the Apple unified-memory fields. Truly
+                  orthogonal data (price, notes, storage, CPU
+                  cores/freq) survives every preset switch. Numbers
+                  verified April 2026.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  <FormulaCard
+                    label="Apple Silicon — Max"
+                    models="M1 / M2 / M3 / M4 / M5 Max"
+                    formula="ramBandwidthGBs + availableRam, efficiency=60%"
+                    note="Unified memory architecture: bandwidth 400 → 614 GB/s, RAM cap 64 → 128 GB. Apple Support tech specs. GPU block is zeroed so calcValueScore takes the RAM-bandwidth branch; BW efficiency snaps to Unified (60%)."
+                  />
+                  <FormulaCard
+                    label="Apple Silicon — Ultra (Mac Studio)"
+                    models="M1 / M2 / M3 Ultra"
+                    formula="ramBandwidthGBs + availableRam, efficiency=60%"
+                    note="Mac Studio chips: 800 → 819 GB/s, RAM cap 128 → 512 GB (M3 Ultra). Same unified-memory branch as Max chips, BW efficiency snaps to Unified (60%)."
+                  />
+                  <FormulaCard
+                    label="NVIDIA Data Center"
+                    models="A100 40/80 · H100 PCIe/SXM · H200 · B200"
+                    formula="gpuCount=1 + VRAM + GPU BW, efficiency=80%"
+                    note="Per-card numbers from NVIDIA datasheets: A100 80GB ≈ 2 TB/s, H100 SXM ≈ 3.35 TB/s, H200 ≈ 4.8 TB/s, B200 ≈ 8 TB/s. BW efficiency snaps to GPU (80%). Multiply gpuCount manually for multi-GPU servers (8×H100, etc.)."
+                  />
+                  <FormulaCard
+                    label="NVIDIA Consumer"
+                    models="RTX 3090 · RTX 4090 · RTX 5090"
+                    formula="gpuCount=1 + VRAM + GPU BW, efficiency=80%"
+                    note="Single-card desktop GPUs: 3090 ≈ 936 GB/s (24 GB), 4090 ≈ 1008 GB/s (24 GB), 5090 ≈ 1792 GB/s (32 GB GDDR7). BW efficiency snaps to GPU (80%)."
+                  />
+                  <FormulaCard
+                    label="AMD Instinct"
+                    models="MI300X · MI325X"
+                    formula="gpuCount=1 + VRAM + GPU BW, efficiency=80%"
+                    note="OAM data-center accelerators: MI300X 192 GB / 5.3 TB/s HBM3, MI325X 256 GB / 6 TB/s HBM3e. AMD instinct-tech-docs. BW efficiency snaps to GPU (80%)."
+                  />
+                  <FormulaCard
+                    label="Custom"
+                    models="Any combination"
+                    formula="manual fields, dropdown shows 'Custom'"
+                    note="The dropdown auto-switches to Custom whenever you edit any preset-controlled field (gpuVram, ramBandwidthGBs, BW efficiency, …). Underlying numbers are kept — only the label changes. Use this when your real machine doesn't match a single catalog entry (EPYC + H100, multi-GPU box, custom Threadripper, etc.)."
+                  />
+                </div>
+              </div>
+
               {/* Supported formats */}
               <div className="space-y-2">
                 <div className="text-[11px] font-medium text-foreground">
