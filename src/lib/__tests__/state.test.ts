@@ -10,7 +10,7 @@ import type { SavedState } from "../state";
 const minimalCard = {
   id: "test-id-1",
   model: {
-    modelKey: "qwen3.5-27b",
+    modelKey: "qwen3.6-27b",
     customModel: {
       params: 7e9,
       layers: 32,
@@ -133,6 +133,36 @@ describe("decodeState", () => {
   });
 });
 
+// ─── New quant family round-trip ─────────────────────────────────────────────
+// The encoder treats `quant` / `kvQuant` as opaque strings (no enum check),
+// so adding a new QuantName should not require any encoder changes. These
+// tests prove that — and double as a smoke test for typos in QuantName
+// (a typo'd literal would fail the QuantName type check at compile time).
+
+describe("decodeState — new quant families round-trip", () => {
+  const newQuants = [
+    "gptq_8bit",
+    "gptq_4bit",
+    "gptq_3bit",
+    "awq_4bit",
+    "mlx_8bit",
+    "mlx_4bit",
+    "mlx_3bit",
+    "mlx_2bit",
+  ] as const;
+
+  it.each(newQuants)("round-trips quant=%s losslessly", (quant) => {
+    const card = {
+      ...minimalCard,
+      model: { ...minimalCard.model, quant },
+    };
+    const decoded = decodeState(
+      encodeState({ mode: "single", configs: [card] }),
+    );
+    expect(decoded?.configs[0]?.model.quant).toBe(quant);
+  });
+});
+
 // ─── Golden URLs (backward compatibility) ────────────────────────────────────
 // The values below are committed verbatim and must decode forever. A
 // breakage here means every previously-shared link would 404 (or silently
@@ -178,6 +208,11 @@ describe("decodeState (golden URLs)", () => {
     // If encodeState ever changes shape (field renames, key reordering,
     // compression, etc.), this assertion will fail and we will know we
     // are about to break every existing shared link.
+    //
+    // The encoded modelKey is "qwen3.5-27b", which has been removed from
+    // KNOWN_MODELS — that's intentional. The decoder must still return the
+    // original string verbatim; UI falls back to "custom" / placeholder
+    // labels for unknown keys, so no link breaks even if the catalog drifts.
     const HISTORICAL_GOLDEN =
       "eyJtb2RlIjoic2luZ2xlIiwiY29uZmlncyI6W3siaWQiOiJnb2xkZW4taWQtMSIsIm1vZGVsIjp7Im1vZGVsS2V5IjoicXdlbjMuNS0yN2IiLCJjdXN0b21Nb2RlbCI6eyJwYXJhbXMiOjcwMDAwMDAwMDAsImxheWVycyI6MzIsImt2SGVhZHMiOjgsImhlYWREaW0iOjEyOCwibW9lIjpmYWxzZX0sInF1YW50IjoicTRfa19tIiwia3ZRdWFudCI6ImJmMTYiLCJjb250ZXh0SyI6MzIsImNvbmN1cnJlbnRVc2VycyI6MSwia3ZDYWNoZUZpbGxQY3QiOjEwMH0sImhvc3RpbmciOnsicHJpY2UiOiIiLCJncHVDb3VudCI6IiIsImdwdVZyYW0iOiIiLCJncHVJbmZvIjoiIiwiZ3B1QmFuZHdpZHRoIjoiIiwiY3B1Q29yZXMiOiIiLCJjcHVGcmVxR0h6IjoiIiwiY3B1TW9kZWwiOiIiLCJyYW1CYW5kd2lkdGhHQnMiOiIiLCJyYW1UeXBlIjoiIiwic3RvcmFnZVR5cGUiOiIiLCJlZmZpY2llbmN5IjoiODAiLCJub3RlcyI6IiIsImF2YWlsYWJsZVJhbSI6IiIsImF2YWlsYWJsZVN0b3JhZ2UiOiIiLCJvc092ZXJoZWFkR2IiOjJ9fV19";
     const decoded = decodeState(HISTORICAL_GOLDEN);

@@ -4,9 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { ConcurrentUsersInput } from "../ConcurrentUsersInput";
 import {
   resolveActiveEngine,
+  pickCompatibleEngine,
   ENGINE_PRESETS,
   CUSTOM_ENGINE_ID,
 } from "@/lib/enginePresets";
+import { QUANT_FAMILY_ENGINES, getQuantFamily } from "@/lib/quants";
+import type { QuantName } from "@/lib/types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -14,6 +17,12 @@ interface RenderOpts {
   concurrentUsers?: number;
   kvCacheFillPct?: number;
   engineId?: string | undefined;
+  /**
+   * Default "fp16" — float family is compatible with EVERY engine preset,
+   * so existing tests written before quant filtering keep their semantics.
+   * Tests that exercise filtering should pass an explicit quant.
+   */
+  quant?: QuantName;
   onConcurrentUsersChange?: (v: number) => void;
   onKvCacheFillPctChange?: (v: number) => void;
   onEngineChange?: (id: string, pct: number) => void;
@@ -28,6 +37,7 @@ function renderInput(overrides: RenderOpts = {}) {
       concurrentUsers={overrides.concurrentUsers ?? 1}
       kvCacheFillPct={overrides.kvCacheFillPct ?? 100}
       engineId={overrides.engineId}
+      quant={overrides.quant ?? "fp16"}
       onConcurrentUsersChange={onConcurrentUsersChange}
       onKvCacheFillPctChange={onKvCacheFillPctChange}
       onEngineChange={onEngineChange}
@@ -90,6 +100,72 @@ describe("resolveActiveEngine", () => {
   });
 });
 
+// ─── Pure logic: pickCompatibleEngine (auto-snap source of truth) ─────────
+//
+// Auto-snap behaviour in ConfigCard reduces to this single function. By
+// testing it in isolation we cover every (quant family, current engine)
+// permutation without spinning up a full DOM render of ConfigCard.
+
+describe("pickCompatibleEngine", () => {
+  function setFor(quant: QuantName) {
+    return QUANT_FAMILY_ENGINES[getQuantFamily(quant)];
+  }
+
+  it("returns null when current engine is already compatible (no snap needed)", () => {
+    // GGUF on llama.cpp — already valid, must not be touched.
+    expect(pickCompatibleEngine(setFor("q4_k_m"), "llamacpp")).toBeNull();
+    // AWQ on vLLM — already valid.
+    expect(pickCompatibleEngine(setFor("awq_4bit"), "vllm")).toBeNull();
+    // GPTQ on TensorRT-LLM — already valid.
+    expect(pickCompatibleEngine(setFor("gptq_4bit"), "tensorrt")).toBeNull();
+    // "custom" is universally compatible.
+    expect(pickCompatibleEngine(setFor("awq_4bit"), CUSTOM_ENGINE_ID)).toBeNull();
+  });
+
+  it("snaps GGUF→AWQ to the first GPU preset (vLLM, 25% KV)", () => {
+    expect(pickCompatibleEngine(setFor("awq_4bit"), "llamacpp")).toEqual({
+      engineId: "vllm",
+      kvCacheFillPct: 25,
+    });
+  });
+
+  it("snaps GGUF→GPTQ to the first GPU preset (vLLM, 25% KV)", () => {
+    expect(pickCompatibleEngine(setFor("gptq_4bit"), "llamacpp")).toEqual({
+      engineId: "vllm",
+      kvCacheFillPct: 25,
+    });
+  });
+
+  it("snaps AWQ→GGUF back to llama.cpp (100% KV)", () => {
+    expect(pickCompatibleEngine(setFor("q4_k_m"), "vllm")).toEqual({
+      engineId: "llamacpp",
+      kvCacheFillPct: 100,
+    });
+  });
+
+  it("snaps AWQ→MLX to the llama.cpp preset (MLX shares the 100% pre-allocation slot)", () => {
+    expect(pickCompatibleEngine(setFor("mlx_4bit"), "vllm")).toEqual({
+      engineId: "llamacpp",
+      kvCacheFillPct: 100,
+    });
+  });
+
+  it("treats undefined engineId as 'no current selection' and picks the first compatible preset", () => {
+    // Legacy URLs without engineId — pick a sensible default rather than
+    // leaving things in an ambiguous state.
+    expect(pickCompatibleEngine(setFor("awq_4bit"), undefined)).toEqual({
+      engineId: "vllm",
+      kvCacheFillPct: 25,
+    });
+  });
+
+  it("Float family is compatible with every engine (no snap)", () => {
+    expect(pickCompatibleEngine(setFor("fp16"), "llamacpp")).toBeNull();
+    expect(pickCompatibleEngine(setFor("fp16"), "vllm")).toBeNull();
+    expect(pickCompatibleEngine(setFor("fp16"), "tensorrt")).toBeNull();
+  });
+});
+
 // ─── Tests: trigger labels ──────────────────────────────────────────────────
 
 describe("ConcurrentUsersInput — trigger labels reflect current value", () => {
@@ -102,6 +178,7 @@ describe("ConcurrentUsersInput — trigger labels reflect current value", () => 
       <ConcurrentUsersInput
         concurrentUsers={4}
         kvCacheFillPct={100}
+        quant="fp16"
         onConcurrentUsersChange={vi.fn()}
         onKvCacheFillPctChange={vi.fn()}
         onEngineChange={vi.fn()}
@@ -122,6 +199,7 @@ describe("ConcurrentUsersInput — trigger labels reflect current value", () => 
         concurrentUsers={1}
         kvCacheFillPct={25}
         engineId="vllm"
+        quant="fp16"
         onConcurrentUsersChange={vi.fn()}
         onKvCacheFillPctChange={vi.fn()}
         onEngineChange={vi.fn()}
@@ -134,6 +212,7 @@ describe("ConcurrentUsersInput — trigger labels reflect current value", () => 
         concurrentUsers={1}
         kvCacheFillPct={30}
         engineId="tensorrt"
+        quant="fp16"
         onConcurrentUsersChange={vi.fn()}
         onKvCacheFillPctChange={vi.fn()}
         onEngineChange={vi.fn()}
@@ -332,6 +411,7 @@ describe("ConcurrentUsersInput — switching engine to/from Custom", () => {
         concurrentUsers={1}
         kvCacheFillPct={pct}
         engineId={engineId}
+        quant="fp16"
         onConcurrentUsersChange={vi.fn()}
         onKvCacheFillPctChange={vi.fn()}
         onEngineChange={onEngineChange}
@@ -350,6 +430,7 @@ describe("ConcurrentUsersInput — switching engine to/from Custom", () => {
         concurrentUsers={1}
         kvCacheFillPct={pct}
         engineId={engineId}
+        quant="fp16"
         onConcurrentUsersChange={vi.fn()}
         onKvCacheFillPctChange={vi.fn()}
         onEngineChange={onEngineChange}
@@ -388,6 +469,7 @@ describe("ConcurrentUsersInput — users Custom… can be picked at a preset val
       <ConcurrentUsersInput
         concurrentUsers={5}
         kvCacheFillPct={100}
+        quant="fp16"
         onConcurrentUsersChange={onConcurrentUsersChange}
         onKvCacheFillPctChange={vi.fn()}
         onEngineChange={vi.fn()}
@@ -406,6 +488,7 @@ describe("ConcurrentUsersInput — users Custom… can be picked at a preset val
       <ConcurrentUsersInput
         concurrentUsers={16}
         kvCacheFillPct={100}
+        quant="fp16"
         onConcurrentUsersChange={onConcurrentUsersChange}
         onKvCacheFillPctChange={vi.fn()}
         onEngineChange={vi.fn()}
@@ -433,5 +516,91 @@ describe("ConcurrentUsersInput — engine dropdown lists every documented engine
       expect(utils.getByText(preset.engines)).toBeInTheDocument();
     }
     expect(utils.getByText(/Custom KV %/)).toBeInTheDocument();
+  });
+});
+
+// ─── Tests: engine filtering by quant family ───────────────────────────────
+// Quant family decides which engines are physically capable of running the
+// model (GGUF → llama.cpp; AWQ/GPTQ → vLLM/TensorRT; MLX → llama.cpp/MLX).
+// The dropdown must hide incompatible options so the user can't pick an
+// impossible combination — Custom KV % is always available as an escape
+// hatch.
+
+describe("ConcurrentUsersInput — engine dropdown filters by quant family", () => {
+  it("GGUF (q4_k_m) shows only the Pre-allocation preset + Custom", async () => {
+    const user = userEvent.setup();
+    renderInput({ quant: "q4_k_m", engineId: "llamacpp" });
+    await user.click(engineTrigger());
+
+    const listbox = await screen.findByRole("listbox");
+    const utils = within(listbox);
+
+    expect(utils.getByText(/Pre-allocation/)).toBeInTheDocument();
+    expect(utils.queryByText(/PagedAttention/)).toBeNull();
+    expect(utils.queryByText(/TensorRT-LLM/)).toBeNull();
+    expect(utils.getByText(/Custom KV %/)).toBeInTheDocument();
+  });
+
+  it("AWQ (awq_4bit) hides Pre-allocation and shows GPU engines + Custom", async () => {
+    const user = userEvent.setup();
+    renderInput({ quant: "awq_4bit", engineId: "vllm", kvCacheFillPct: 25 });
+    await user.click(engineTrigger());
+
+    const listbox = await screen.findByRole("listbox");
+    const utils = within(listbox);
+
+    expect(utils.queryByText(/Pre-allocation/)).toBeNull();
+    expect(utils.getByText(/PagedAttention/)).toBeInTheDocument();
+    // "TensorRT-LLM" appears twice (option label + sub-label) — match either.
+    expect(utils.queryAllByText(/TensorRT-LLM/).length).toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(utils.getByText(/Custom KV %/)).toBeInTheDocument();
+  });
+
+  it("GPTQ (gptq_4bit) hides Pre-allocation just like AWQ", async () => {
+    const user = userEvent.setup();
+    renderInput({ quant: "gptq_4bit", engineId: "vllm", kvCacheFillPct: 25 });
+    await user.click(engineTrigger());
+
+    const listbox = await screen.findByRole("listbox");
+    const utils = within(listbox);
+
+    expect(utils.queryByText(/Pre-allocation/)).toBeNull();
+    expect(utils.getByText(/PagedAttention/)).toBeInTheDocument();
+    // "TensorRT-LLM" appears twice (option label + sub-label) — match either.
+    expect(utils.queryAllByText(/TensorRT-LLM/).length).toBeGreaterThanOrEqual(
+      1,
+    );
+  });
+
+  it("MLX (mlx_4bit) shows only Pre-allocation (the runtime that hosts MLX)", async () => {
+    const user = userEvent.setup();
+    renderInput({ quant: "mlx_4bit", engineId: "llamacpp" });
+    await user.click(engineTrigger());
+
+    const listbox = await screen.findByRole("listbox");
+    const utils = within(listbox);
+
+    expect(utils.getByText(/Pre-allocation/)).toBeInTheDocument();
+    expect(utils.queryByText(/PagedAttention/)).toBeNull();
+    expect(utils.queryByText(/TensorRT-LLM/)).toBeNull();
+  });
+
+  it("Float (fp16) shows every engine — no family restriction", async () => {
+    const user = userEvent.setup();
+    renderInput({ quant: "fp16", engineId: "llamacpp" });
+    await user.click(engineTrigger());
+
+    const listbox = await screen.findByRole("listbox");
+    const utils = within(listbox);
+
+    expect(utils.getByText(/Pre-allocation/)).toBeInTheDocument();
+    expect(utils.getByText(/PagedAttention/)).toBeInTheDocument();
+    // "TensorRT-LLM" appears twice in the option (label + sub-label
+    // "Triton + TensorRT-LLM"). Both must be present, so use queryAllByText.
+    expect(utils.queryAllByText(/TensorRT-LLM/).length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 });

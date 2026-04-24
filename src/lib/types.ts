@@ -69,7 +69,18 @@ export type QuantName =
   | "q4"
   | "q3_k_m"
   | "q2_k"
-  | "q1";
+  | "q1"
+  // GPTQ family — calibration-based PTQ for GPU inference (vLLM / ExLlama)
+  | "gptq_8bit"
+  | "gptq_4bit"
+  | "gptq_3bit"
+  // AWQ family — activation-aware PTQ for GPU inference (vLLM / AutoAWQ)
+  | "awq_4bit"
+  // MLX family — Apple Silicon native quantization (mlx_lm.convert)
+  | "mlx_8bit"
+  | "mlx_4bit"
+  | "mlx_3bit"
+  | "mlx_2bit";
 
 export interface CalcOptions {
   params: number;

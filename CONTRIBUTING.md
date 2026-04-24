@@ -161,11 +161,14 @@ The app is **100% client-side** — no backend, no API routes, no server state. 
 These are things that **must not break** — CI won't catch all of them:
 
 1. **KV formula sync** — `calcLLMRam` and `calcValueScore` both have a `switch (formula)`. They must match.
-2. **Q1 overhead** — Q1 uses `weightOverhead = 1.0` (overhead baked into `QUANT_BITS`), all others use `1.1`.
-3. **QUANT_BITS vs QUANT_BYTES** — they serve different purposes (bits for RAM/disk, bytes for TPS). Don't merge them.
-4. **URL encoding stability** — changing `encodeState`/`decodeState` breaks existing shared links. Golden-URL tests in `src/lib/__tests__/state.test.ts` guard this.
-5. **parseHfUrl regex** — must stop at `?`, `#`, whitespace. Don't simplify.
-6. **MoE effective params** — TPS/bandwidth use `activeParams` (or `params` for dense); RAM/disk always use total `params`. Keep this asymmetry explicit.
+2. **Q1 overhead** — Q1 uses `weightOverhead = 1.0` (overhead baked into `QUANT_BITS["q1"] = 1.25`), all others use `1.1`.
+3. **QUANT_BITS vs QUANT_BYTES** — they serve different purposes (bits for RAM/disk, bytes for TPS). Don't merge them. They MUST stay numerically aligned (`QUANT_BYTES[q] ≈ QUANT_BITS[q] / 8`); a parameterised test in `calculator.test.ts` enforces this.
+4. **QUANT_SPECS is the single source of truth** for quants — when adding a new family or bit-width, update `QUANT_SPECS` (with `family`, `familyLabel`, `bpw`), `QUANT_BYTES` (calculator.ts), and — if a new family is introduced — extend `QUANT_FAMILY_ENGINES` and the engine-filter test in `ConcurrentUsersInput.test.tsx`.
+5. **Engine ⇄ quant compatibility** — UI filtering and auto-snap both go through `QUANT_FAMILY_ENGINES` + `pickCompatibleEngine`. If you change the matrix, update both the unit tests and the ENGINE_TOOLTIP / WEIGHTS_TOOLTIP copy.
+6. **URL encoding stability** — changing `encodeState`/`decodeState` breaks existing shared links. Golden-URL tests in `src/lib/__tests__/state.test.ts` guard this. New `QuantName` values are safe to add — they're stored as opaque strings, no encoder change needed.
+7. **parseHfUrl regex** — must stop at `?`, `#`, whitespace. Don't simplify.
+8. **MoE effective params** — TPS/bandwidth use `activeParams` (or `params` for dense); RAM/disk always use total `params`. Keep this asymmetry explicit.
+9. **HF auto-detection priority** — `quantization_config` (AWQ/GPTQ method+bits) wins over safetensors dtype, which in turn distinguishes MLX repos by org prefix / `mlx` tag. Keep the priority order intact in `fetchHfConfig`.
 
 ## PR Checklist
 

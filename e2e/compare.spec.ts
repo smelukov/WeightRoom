@@ -37,13 +37,13 @@ test.describe("Compare mode", () => {
 
   test("new card inherits the model from the previous card", async ({ page }) => {
     // Confirm first card has the default model
-    await expect(modelTrigger(page, 0)).toContainText(/Qwen 3\.5 27B/i);
+    await expect(modelTrigger(page, 0)).toContainText(/Qwen 3\.6 27B/i);
 
     await page.getByText("Add Configuration").click();
     await page.waitForTimeout(300);
 
     // Second card should also show the same model (inherited from last card)
-    await expect(modelTrigger(page, 1)).toContainText(/Qwen 3\.5 27B/i);
+    await expect(modelTrigger(page, 1)).toContainText(/Qwen 3\.6 27B/i);
   });
 
   test("removing a card back to one hides the comparison chart", async ({ page }) => {

@@ -32,9 +32,13 @@ async function getKvCacheGb(page: Page): Promise<number> {
 }
 
 // Default config:
-//   model: qwen3.5-27b (27B, linear_hybrid, 16 full layers, 32K context)
+//   model: qwen3.6-27b (27B, linear_hybrid, 16 full layers, 32K context)
 //   quant: q4_k_m (4-bit), kvQuant: bf16
 //   expected RAM ≈ 19 GB
+//
+// NB: Qwen 3.6 27B uses the same architecture as the previous default
+// (qwen3.5-27b) — same model_type "qwen3_5", same 64 layers / 16 full /
+// 4 KV heads / head_dim 256. Numerical expectations below are unchanged.
 
 test.describe("Single-card mode", () => {
   test.beforeEach(async ({ page }) => {
@@ -42,13 +46,13 @@ test.describe("Single-card mode", () => {
     await page.waitForSelector(".text-4xl");
   });
 
-  test("shows heading and default model 'Qwen 3.5 27B' in selector", async ({ page }) => {
+  test("shows heading and default model 'Qwen 3.6 27B' in selector", async ({ page }) => {
     await expect(
       page.getByRole("heading", { name: /WeightRoom/i }),
     ).toBeVisible();
 
     // The combobox trigger should show the default model name
-    await expect(modelTrigger(page)).toContainText(/Qwen 3\.5 27B/i);
+    await expect(modelTrigger(page)).toContainText(/Qwen 3\.6 27B/i);
   });
 
   test("default config: RAM is ≈ 19 GB for a 27B q4_k_m model with 32K context", async ({ page }) => {

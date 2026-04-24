@@ -12,6 +12,8 @@ import {
   CUSTOM_ENGINE_ID,
   resolveActiveEngine,
 } from "@/lib/enginePresets";
+import { QUANT_FAMILY_ENGINES, getQuantFamily } from "@/lib/quants";
+import type { QuantName } from "@/lib/types";
 import { InfoTooltip } from "./InfoTooltip";
 
 interface ConcurrentUsersInputProps {
@@ -24,6 +26,14 @@ interface ConcurrentUsersInputProps {
    * matching by `kvCacheFillPct` value. See `ModelSettings.engineId`.
    */
   engineId?: string | undefined;
+  /**
+   * Currently selected weights quantization. Used to filter the engine
+   * dropdown — physically-impossible combinations like AWQ + llama.cpp are
+   * hidden so the user can't accidentally pick one. The parent (ConfigCard)
+   * is also responsible for auto-snapping `engineId` when the user changes
+   * `quant` to an incompatible family.
+   */
+  quant: QuantName;
   onConcurrentUsersChange: (value: number) => void;
   onKvCacheFillPctChange: (value: number) => void;
   /**
@@ -51,7 +61,7 @@ const ENGINE_TOOLTIP = `Inference engine determines how aggressively KV cache is
 
 • PagedAttention engines (vLLM, SGLang, TGI) allocate only what's actively used — typically ~25% for chatbot workloads.
 
-Pick "Custom" if your engine is unusual or you want to model a specific load profile.`;
+The list is filtered by the selected quantization format: GPTQ/AWQ are GPU-only (vLLM / TensorRT), GGUF runs on llama.cpp / Ollama, MLX runs on Apple Silicon. Pick "Custom" to set a manual KV % for any combination.`;
 
 function findPresetById(id: string) {
   return ENGINE_PRESETS.find((p) => p.id === id) ?? null;
@@ -65,6 +75,7 @@ export function ConcurrentUsersInput({
   concurrentUsers,
   kvCacheFillPct,
   engineId,
+  quant,
   onConcurrentUsersChange,
   onKvCacheFillPctChange,
   onEngineChange,
@@ -78,6 +89,15 @@ export function ConcurrentUsersInput({
     !usersForceCustom && USER_PRESETS.includes(concurrentUsers);
 
   const enginePreset = resolveActiveEngine(engineId, kvCacheFillPct);
+
+  // Filter engine presets by quant family. The parent (ConfigCard) is
+  // responsible for auto-snapping the engineId when quant changes — by the
+  // time we render here, `enginePreset` is guaranteed to be either null
+  // (custom) or one of the visible options.
+  const compatibleEngines = QUANT_FAMILY_ENGINES[getQuantFamily(quant)];
+  const visiblePresets = ENGINE_PRESETS.filter((p) =>
+    compatibleEngines.has(p.id),
+  );
 
   const handleUsersSelect = (value: string | null) => {
     if (value === null) return;
@@ -183,7 +203,7 @@ export function ConcurrentUsersInput({
               <span className="truncate">{engineTriggerLabel}</span>
             </SelectTrigger>
             <SelectContent>
-              {ENGINE_PRESETS.map((preset) => (
+              {visiblePresets.map((preset) => (
                 <SelectItem key={preset.id} value={preset.id}>
                   <div className="flex flex-col items-start gap-0.5 py-0.5">
                     <span className="text-sm">

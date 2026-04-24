@@ -81,7 +81,7 @@ export function CustomModelForm({
         <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <SiHuggingface className="w-3.5 h-3.5" aria-hidden="true" />
           Import from HuggingFace
-          <InfoTooltip content="Paste a HuggingFace model URL to auto-fill architecture parameters from config.json. Use the original model repo, not GGUF/quantized forks." />
+          <InfoTooltip content="Paste a HuggingFace model URL to auto-fill architecture parameters from config.json. The original Transformers repo is the most reliable source, but AutoGPTQ / AutoAWQ / MLX forks also work — they ship config.json and we'll auto-detect the quantization from quantization_config or safetensors metadata. Pure llama.cpp GGUF repos have no config.json and aren't supported — import the source Transformers repo and pick the GGUF quant manually." />
         </div>
         <div className="flex gap-2">
           <Input

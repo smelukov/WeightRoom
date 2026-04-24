@@ -113,7 +113,7 @@ export function getRamStatus(
 
 /** Breakdown of estimated on-disk storage requirements. */
 export interface DiskResult {
-  /** Quantized model file size (GGUF format). */
+  /** Quantized model file size on disk (GGUF, GPTQ, AWQ, MLX, or float). */
   modelFileGb: number;
   /** Fixed OS / system files overhead. */
   osOverheadGb: number;
@@ -150,7 +150,15 @@ export function getDiskStatus(
   return "exceeds";
 }
 
-/** Bytes per parameter for each quantization level. */
+/**
+ * Bytes per parameter for each quantization level.
+ *
+ * Used by `calcValueScore` for TPS / bandwidth math (kept separate from
+ * `QUANT_BITS` so we can reason about RAM/disk in bits and TPS in bytes
+ * without juggling unit conversions inside the formulas — see AGENTS.md).
+ *
+ * Values mirror QUANT_SPECS.bpw / 8 — when adding a new quant, update both.
+ */
 export const QUANT_BYTES: Record<string, number> = {
   fp32: 4,
   fp16: 2,
@@ -163,7 +171,22 @@ export const QUANT_BYTES: Record<string, number> = {
   q4: 0.5,
   q3_k_m: 0.375,
   q2_k: 0.25,
-  q1: 0.125,
+  // q1 = 1.25 bpw (sign bit + 0.25 bpw amortized scale/bias) — matches
+  // QUANT_BITS["q1"]. Previously this was 0.125 (1.0 bpw exactly) which
+  // was inconsistent with the RAM math and would have surfaced as a TPS
+  // estimate ~25% too high for 1-bit models.
+  q1: 1.25 / 8,
+  // GPTQ — bpw/8 with +0.25 bpw overhead for FP16 scale + zero-point per g128
+  gptq_8bit: 8.25 / 8,
+  gptq_4bit: 4.25 / 8,
+  gptq_3bit: 3.25 / 8,
+  // AWQ — same +0.25 bpw overhead (FP16 scale + scaled_zero per g128)
+  awq_4bit: 4.25 / 8,
+  // MLX — bits + 0.5 bpw (FP16 scale + bias per g64)
+  mlx_8bit: 8.5 / 8,
+  mlx_4bit: 4.5 / 8,
+  mlx_3bit: 3.5 / 8,
+  mlx_2bit: 2.5 / 8,
 };
 
 /** Input for value score calculation. */

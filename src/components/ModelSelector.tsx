@@ -31,8 +31,8 @@ import {
  * in the target string (case-insensitive).
  *
  * Examples:
- *   "qwen 27"  → matches "Qwen 3.5 27B"  (both "qwen" and "27" found)
- *   "3 27"     → matches "Qwen 3.5 27B"  (both "3" and "27" found)
+ *   "qwen 27"  → matches "Qwen 3.6 27B"  (both "qwen" and "27" found)
+ *   "3 27"     → matches "Qwen 3.6 27B"  (both "3" and "27" found)
  *   "llama 70" → matches "Llama 3.3 70B"
  */
 function matchesWords(query: string, target: string): boolean {

@@ -45,7 +45,7 @@ function buildModelSettings(
   overrides: Partial<ModelSettings> = {},
 ): ModelSettings {
   return {
-    modelKey: "qwen3.5-27b",
+    modelKey: "qwen3.6-27b",
     customModel: {
       name: "Custom",
       params: 7e9,

@@ -133,7 +133,7 @@ export function Footer() {
               <FormulaBlock
                 title="Storage"
                 formula="Params × (bits / 8) × 1.05  +  20 GB OS"
-                note="The ×1.05 is the on-disk equivalent of the ×1.1 RAM overhead — slightly smaller because GGUF packs unquantized tensors more densely. OS overhead covers a minimal Linux installation."
+                note="The ×1.05 is the on-disk equivalent of the ×1.1 RAM overhead — slightly smaller because the embeddings / lm_head are typically saved at lower precision than they're loaded with at runtime, and tokenizer / config files contribute a fraction of a percent. Applies uniformly to GGUF, GPTQ, AWQ, MLX and float checkpoints. OS overhead covers a minimal Linux installation."
               />
 
               {/* Limitations / accuracy of TPS estimates */}
@@ -197,15 +197,21 @@ export function Footer() {
                 <div className="grid sm:grid-cols-2 gap-2">
                   <FormulaCard
                     label="HF Transformers"
-                    models="Full-precision BF16/FP16, GPTQ, AWQ"
+                    models="Full-precision BF16/FP16/FP32"
                     formula="config.json + safetensors"
-                    note="Fully supported. Quantization auto-detected for INT4 / INT8 / FP8 models."
+                    note="Fully supported. Pick any quantization manually after import."
+                  />
+                  <FormulaCard
+                    label="GPTQ / AWQ"
+                    models="AutoGPTQ, AutoAWQ, TheBloke -GPTQ / -AWQ"
+                    formula="quantization_config in config.json"
+                    note="Auto-detected when quantization_config sets quant_method=gptq (3/4/8 bit) or awq (4 bit). Engine list filters down to vLLM / TensorRT-LLM."
                   />
                   <FormulaCard
                     label="MLX (Apple Silicon)"
-                    models="mlx-community and similar repos"
-                    formula="config.json present"
-                    note="Works for standard quants. 1-bit U32 packing may misreport param count — import the original repo instead."
+                    models="mlx-community/* and 'mlx' tag"
+                    formula="INT4 / INT8 dtype + repo metadata"
+                    note="Auto-detected by the mlx-community/ org prefix or the 'mlx' tag. 1-bit U32 packing may misreport param count — import the original repo instead."
                   />
                   <FormulaCard
                     label="GGUF (llama.cpp)"
